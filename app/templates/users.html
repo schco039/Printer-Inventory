@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% set nav = 'users' %}
+{% block content %}
+
+<h1>Utilisateurs <span class="count">{{ users|length }}</span></h1>
+
+<p class="hint">
+  Les personnes qui retirent du matériel au kiosque. Les badges (myCard et
+  Salto) seront ajoutés en M4 — d'ici là, la personne se choisit dans une liste.
+</p>
+
+<section class="panel">
+  <h2>Ajouter</h2>
+  <form method="post" class="inline-form">
+    <input type="hidden" name="user_id" value="0">
+    <label class="grow">
+      <span>Nom</span>
+      <input type="text" name="nom" required placeholder="Prénom Nom">
+    </label>
+    <label>
+      <span>Rôle</span>
+      <select name="role">
+        <option value="user">Utilisateur</option>
+        <option value="admin">Administrateur</option>
+      </select>
+    </label>
+    <button type="submit" class="primary">Ajouter</button>
+  </form>
+</section>
+
+{% if users %}
+<div class="table-wrap">
+  <table>
+    <thead><tr><th>Nom</th><th>Rôle</th><th>myCard</th><th>Salto</th><th class="r">Mouvements</th><th>État</th><th></th></tr></thead>
+    <tbody>
+      {% for u in users %}
+      <tr class="{{ 'is-absent' if not u.actif }}">
+        <td>{{ u.nom }}</td>
+        <td>{{ 'Administrateur' if u.role == 'admin' else 'Utilisateur' }}</td>
+        <td>{{ '●' if u.mycard_hash else '○' }}</td>
+        <td>{{ '●' if u.salto_hash else '○' }}</td>
+        <td class="r">{{ counts.get(u.id, 0) }}</td>
+        <td>{% if u.actif %}<span class="tag green">actif</span>{% else %}<span class="tag grey">inactif</span>{% endif %}</td>
+        <td class="r">
+          <form method="post" class="inline-form">
+            <input type="hidden" name="user_id" value="{{ u.id }}">
+            <input type="hidden" name="nom" value="{{ u.nom }}">
+            <input type="hidden" name="role" value="{{ u.role }}">
+            <input type="hidden" name="actif" value="{{ '0' if u.actif else '1' }}">
+            <button type="submit" class="link-btn">{{ 'Désactiver' if u.actif else 'Réactiver' }}</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="hint">Aucun utilisateur. Ajoutez au moins une personne pour pouvoir utiliser le kiosque.</p>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,14 @@
+{% extends "kiosk_base.html" %}
+{% block heading %}Choisir la marque{% endblock %}
+{% block content %}
+
+<div class="k-tiles">
+  {% for marque, nb in marques %}
+  <a class="k-tile" href="/kiosk/marque/{{ marque }}">
+    <span class="k-tile-name">{{ marque }}</span>
+    <span class="k-tile-meta">{{ nb }} appareil{{ 's' if nb > 1 }}</span>
+  </a>
+  {% endfor %}
+</div>
+
+{% endblock %}

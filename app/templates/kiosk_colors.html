@@ -1,0 +1,54 @@
+{% extends "kiosk_base.html" %}
+
+{% block back %}<a class="k-back" href="/kiosk">‹ Retour</a>{% endblock %}
+{% block heading %}{{ model.libelle }}{% endblock %}
+
+{% block content %}
+
+{% if groups %}
+<div class="k-colors">
+  {% for g in groups %}
+  <div class="k-color {{ 'is-empty' if g.total <= 0 }}">
+    <div class="k-color-head">
+      {% if g.couleur %}<span class="k-swatch swatch-{{ g.couleur }}"></span>{% endif %}
+      <span class="k-color-name">{{ g.label|upper }}</span>
+    </div>
+
+    {% for item in g['items'] %}
+    {% set c = item.consumable %}
+    {% set qte = item.qte %}
+    {% if qte > 0 %}
+    <a class="k-item" href="/kiosk/retrait/{{ c.id }}">
+      <span class="k-sku">{{ c.sku }}</span>
+      <span class="k-qte {{ 'low' if qte < c.seuil_alerte }}">{{ qte }}</span>
+    </a>
+    {% else %}
+    <span class="k-item k-item-empty">
+      <span class="k-sku">{{ c.sku }}</span>
+      <span class="k-qte zero">RUPTURE</span>
+    </span>
+    {% endif %}
+    {% endfor %}
+  </div>
+  {% endfor %}
+</div>
+
+<p class="k-note">{{ nb }} appareil{{ 's' if nb > 1 }} de ce modèle en service</p>
+
+<div class="k-secondary">
+  <span>Rapporter du matériel au stock ?</span>
+  <div class="k-return-list">
+    {% for g in groups %}{% for item in g['items'] %}
+    <a class="k-return" href="/kiosk/retrait/{{ item.consumable.id }}?sens=retour">+ {{ item.consumable.sku }}</a>
+    {% endfor %}{% endfor %}
+  </div>
+</div>
+
+{% else %}
+<p class="k-empty">
+  Aucun consommable n'est configuré pour ce modèle.<br>
+  Prévenez l'administrateur.
+</p>
+{% endif %}
+
+{% endblock %}

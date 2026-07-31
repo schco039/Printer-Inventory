@@ -1,0 +1,64 @@
+{% extends "kiosk_base.html" %}
+
+{% block back %}<a class="k-back" href="javascript:history.back()">‹ Annuler</a>{% endblock %}
+{% block heading %}{{ 'Rapporter' if sens == 'retour' else 'Retirer' }}{% endblock %}
+
+{% block content %}
+
+{% if erreur %}<p class="k-error">{{ erreur }}</p>{% endif %}
+
+<form method="post" action="/kiosk/retrait" class="k-form">
+  <input type="hidden" name="consumable_id" value="{{ consumable.id }}">
+  <input type="hidden" name="sens" value="{{ sens }}">
+
+  <div class="k-summary">
+    <span class="k-sku-big">{{ consumable.sku }}</span>
+    <span class="k-desig">{{ consumable.designation }}</span>
+    <span class="k-stock">Stock actuel : <strong>{{ qte }}</strong></span>
+  </div>
+
+  <div class="k-qty">
+    <span class="k-label">Quantité</span>
+    <div class="k-stepper">
+      <button type="button" class="k-step" onclick="stepQty(-1)">−</button>
+      <input type="number" name="quantite" id="qty" value="1" min="1" max="99" readonly>
+      <button type="button" class="k-step" onclick="stepQty(1)">+</button>
+    </div>
+  </div>
+
+  <div class="k-who">
+    <span class="k-label">Qui ?</span>
+    {% if users %}
+    <div class="k-people">
+      {% for u in users %}
+      <label class="k-person">
+        <input type="radio" name="user_id" value="{{ u.id }}" {{ 'checked' if loop.first }}>
+        <span>{{ u.nom }}</span>
+      </label>
+      {% endfor %}
+    </div>
+    <p class="k-hint">Le badge myCard / Salto remplacera cette liste (M4).</p>
+    {% else %}
+    <input type="hidden" name="user_id" value="0">
+    <p class="k-hint">Aucune personne enregistrée — le mouvement sera anonyme.</p>
+    {% endif %}
+  </div>
+
+  <button type="submit" class="k-confirm">
+    {{ 'Confirmer le retour' if sens == 'retour' else 'Confirmer le retrait' }}
+  </button>
+</form>
+
+{% endblock %}
+
+{% block script %}
+<script>
+  function stepQty(d) {
+    var input = document.getElementById('qty');
+    var v = parseInt(input.value, 10) + d;
+    if (v < 1) { v = 1; }
+    if (v > 99) { v = 99; }
+    input.value = v;
+  }
+</script>
+{% endblock %}

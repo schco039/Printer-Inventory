@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% set nav = 'compat' %}
+{% block content %}
+
+{% set manquants = rows | rejectattr('consumables') | list %}
+
+<h1>Compatibilités
+  {% if manquants %}<span class="count warn-text">⚠ {{ manquants|length }} à configurer</span>{% endif %}
+</h1>
+
+<p class="hint">
+  Chaque modèle en service doit avoir ses consommables. L'assistant crée un jeu
+  complet en une fois — ou copie celui d'un modèle existant.
+</p>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Modèle</th><th class="r">App.</th><th>Consommables</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr class="{{ 'row-todo' if not r.consumables }}">
+        <td><strong>{{ r.model.libelle }}</strong></td>
+        <td class="r">{{ r.nb }}</td>
+        <td>
+          {% if r.consumables %}
+            {% for c in r.consumables %}
+            <span class="pill">
+              {% if c.couleur %}<span class="dot dot-{{ c.couleur }}"></span>{% endif %}{{ c.sku }}
+            </span>
+            {% endfor %}
+          {% else %}
+            <span class="tag orange">aucun</span>
+          {% endif %}
+        </td>
+        <td class="r">
+          <a class="btn {{ 'primary' if not r.consumables }}" href="/admin/compatibilites/{{ r.model.id }}">
+            {{ 'Configurer' if not r.consumables else 'Modifier' }}
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if not rows %}
+<p class="hint">Aucun modèle. <a href="/admin/import">Importer d'abord l'inventaire</a>.</p>
+{% endif %}
+
+{% endblock %}

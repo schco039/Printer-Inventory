@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% set nav = 'consommables' %}
+{% block content %}
+
+<h1>{{ 'Modifier le consommable' if consumable else 'Nouveau consommable' }}</h1>
+
+{% if request.query_params.get('doublon') %}
+<p class="banner warn">Cette référence existe déjà — voici la fiche correspondante.</p>
+{% endif %}
+
+<form method="post" action="/admin/consommables" class="panel form">
+  <input type="hidden" name="consumable_id" value="{{ consumable.id if consumable else 0 }}">
+
+  <div class="grid2">
+    <label>
+      <span>Référence *</span>
+      <input type="text" name="sku" value="{{ consumable.sku if consumable else '' }}" required
+             placeholder="TN-423BK">
+    </label>
+    <label>
+      <span>Désignation</span>
+      <input type="text" name="designation" value="{{ consumable.designation if consumable else '' }}"
+             placeholder="générée automatiquement si vide">
+    </label>
+    <label>
+      <span>Type</span>
+      <select name="type">
+        {% for key, label in type_label.items() %}
+        <option value="{{ key }}" {{ 'selected' if consumable and consumable.type == key }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      <span>Couleur</span>
+      <select name="couleur">
+        <option value="">— aucune —</option>
+        {% for key, label in color_label.items() %}
+        <option value="{{ key }}" {{ 'selected' if consumable and consumable.couleur == key }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      <span>Marque</span>
+      <input type="text" name="marque" value="{{ consumable.marque or '' if consumable else '' }}">
+    </label>
+    <label>
+      <span>Code-barres (EAN)</span>
+      <input type="text" name="ean" value="{{ consumable.ean or '' if consumable else '' }}"
+             placeholder="scanner l'emballage">
+    </label>
+    <label>
+      <span>Emplacement</span>
+      <input type="text" name="emplacement" value="{{ consumable.emplacement or '' if consumable else '' }}"
+             placeholder="étagère A3">
+    </label>
+    <label>
+      <span>Seuil d'alerte</span>
+      <input type="number" name="seuil_alerte" min="0" value="{{ consumable.seuil_alerte if consumable else 0 }}">
+    </label>
+  </div>
+
+  <label class="check">
+    <input type="checkbox" name="actif" value="1" {{ 'checked' if not consumable or consumable.actif }}>
+    <span>Actif (visible au kiosque)</span>
+  </label>
+
+  <fieldset>
+    <legend>Modèles compatibles</legend>
+    <div class="checklist">
+      {% for m in models %}
+      <label class="check">
+        <input type="checkbox" name="modeles" value="{{ m.id }}" {{ 'checked' if m.id in linked_ids }}>
+        <span>{{ m.libelle }}</span>
+      </label>
+      {% endfor %}
+    </div>
+  </fieldset>
+
+  <div class="actions">
+    <a class="btn" href="/admin/consommables">Annuler</a>
+    <button type="submit" class="primary">Enregistrer</button>
+  </div>
+</form>
+
+{% if consumable %}
+<section class="panel">
+  <h2>État</h2>
+  <p>
+    Stock actuel : <strong>{{ stock }}</strong> ·
+    {{ nb_mouvements }} mouvement(s) enregistré(s) —
+    <a href="/admin/mouvements?consumable={{ consumable.id }}">voir l'historique</a>
+  </p>
+  <p class="hint">
+    Un consommable ne se supprime pas : décochez « Actif » pour le retirer du
+    kiosque. L'historique des mouvements doit rester lisible.
+  </p>
+</section>
+{% endif %}
+
+{% endblock %}

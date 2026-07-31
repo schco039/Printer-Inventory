@@ -816,23 +816,26 @@ Wichtiger als der Termin ist, dass ab dem ersten Buchungstag lückenlos gebucht 
 
 ## 11. Meilensteine
 
-| # | Inhalt | Ergebnis | Ziel |
+| # | Inhalt | Ergebnis | Stand |
 |---|---|---|---|
-| **M0** | Repo, Docker-Skelett, Health-Check, Alembic | `docker compose up` liefert eine Seite | Aug |
-| **M1** | Datenmodell + Excel-Import inkl. Diff-Vorschau + Druckerliste | Die echte Excel ist importiert, 90 Geräte sichtbar | Aug |
-| **M2** | Consommables-CRUD + Kompatibilitätsmatrix + Inventurmaske | Toner-Zuordnung gepflegt | Aug |
-| **M3** | Kiosk-UI + Bewegungen, noch ohne Badge (Person aus Liste) | Am Touchscreen bedienbar | **vor 01.09.** |
+| **M0** | Repo, Docker-Skelett, Health-Check, Alembic | `docker compose up` liefert eine Seite | ✅ fertig |
+| **M1** | Datenmodell + Excel-Import inkl. Diff-Vorschau + Druckerliste | Die echte Excel ist importiert, 90 Geräte sichtbar | ✅ fertig |
+| **M2** | Consommables-CRUD + Kompatibilitätsmatrix + Inventurmaske | Toner-Zuordnung gepflegt | ✅ fertig |
+| **M3** | Kiosk-UI + Bewegungen, noch ohne Badge (Person aus Liste) | Am Touchscreen bedienbar | ✅ fertig |
 | — | **Eröffnungsinventur, Produktivstart** | Buchungen laufen | **01.09.2026** |
 | **M4** | Badges, HMAC, Anlernen, Kiosk-Buchung per Badge | Restaurant-Logik läuft | Sept |
 | **M5** | Wareneingang + Lieferungen | Bestellungen einpflegbar | Sept/Okt |
 | **M6** | Bestellvorschlag, Backup-Job, CSV-Export | Voller Funktionsumfang | Herbst |
 | **M7** | Saisonanalyse: Heatmap, Jahresvergleich, Spitzenmonate, saisonaler Bestellvorschlag | ab 2. Schuljahr aussagekräftig | 2027 |
 
-M0–M3 in vier Wochen ist machbar, weil der Umfang klein und die Datenlage
-geklärt ist. **Der kritische Pfad ist nicht der Code, sondern die
-Materialstammdaten** — die 24 Datensätze mit den richtigen Bestellnummern
-und die Kompatibilitätsmatrix. Das kann parallel zu M0/M1 passieren und
-braucht dich, nicht mich.
+M0–M3 stehen. **Der kritische Pfad ist damit nicht mehr der Code, sondern die
+Materialstammdaten** — die rund 24 Datensätze mit den richtigen Bestellnummern
+und die Kompatibilitätsmatrix. Das braucht dich, nicht mich, und ist die
+Voraussetzung für die Eröffnungsinventur.
+
+Bis M5 fertig ist, wird der Wareneingang über die manuelle Korrekturbuchung
+unter `/admin/mouvements` erfasst — funktional gleichwertig, nur ohne
+Lieferschein-Zuordnung.
 
 M7 steht bewusst am Ende: die Auswertung braucht Daten, die erst der Betrieb
 erzeugt. Die **Datenerfassung dafür ist aber schon ab M3 vollständig**

@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% set nav = 'mouvements' %}
+{% block content %}
+
+<h1>Mouvements</h1>
+
+{% if request.query_params.get('ok') %}
+<p class="banner ok">✓ {{ request.query_params.get('ok') }} écriture(s) enregistrée(s).</p>
+{% endif %}
+
+<form class="filters" method="get">
+  <select name="consumable">
+    <option value="0">Tous les consommables</option>
+    {% for c in catalogue %}
+    <option value="{{ c.id }}" {{ 'selected' if consumable_filtre == c.id }}>{{ c.sku }}</option>
+    {% endfor %}
+  </select>
+  <select name="motif">
+    <option value="">Tous les motifs</option>
+    {% for key, label in motif_label.items() %}
+    <option value="{{ key }}" {{ 'selected' if motif_filtre == key }}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit">Filtrer</button>
+</form>
+
+{% if catalogue %}
+<details class="panel">
+  <summary>Correction manuelle</summary>
+  <form method="post" action="/admin/mouvements/correction" class="inline-form">
+    <select name="consumable_id">
+      {% for c in catalogue %}
+      <option value="{{ c.id }}">{{ c.sku }} — {{ c.designation }}</option>
+      {% endfor %}
+    </select>
+    <label>
+      <span>Quantité (+ ou −)</span>
+      <input type="number" name="delta" value="1" class="tiny" required>
+    </label>
+    <label class="grow">
+      <span>Motif de la correction</span>
+      <input type="text" name="note" placeholder="ex. cartouche défectueuse retournée">
+    </label>
+    <button type="submit">Enregistrer</button>
+  </form>
+  <p class="hint">
+    Les écritures ne sont jamais supprimées. Une erreur se corrige par une
+    écriture inverse, ce qui reste visible dans l'historique.
+  </p>
+</details>
+{% endif %}
+
+{% if movements %}
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Date</th><th>Réf.</th><th class="r">Qté</th><th>Motif</th><th>Personne</th><th>Note</th><th>Année</th></tr>
+    </thead>
+    <tbody>
+      {% for m in movements %}
+      {% set c = consumables.get(m.consumable_id) %}
+      <tr>
+        <td>{{ m.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+        <td class="mono">{{ c.sku if c else '?' }}</td>
+        <td class="r {{ 'neg' if m.delta < 0 else 'pos' }}">{{ '+' if m.delta > 0 }}{{ m.delta }}</td>
+        <td>{{ motif_label.get(m.motif, m.motif) }}</td>
+        <td>
+          {{ users[m.user_id].nom if m.user_id and m.user_id in users else '—' }}
+          {% if m.badge_type %}<span class="tag grey">{{ m.badge_type }}</span>{% endif %}
+        </td>
+        <td class="hint">{{ m.note or '' }}</td>
+        <td class="mono">{{ m.annee_scolaire }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="hint">Aucun mouvement enregistré.</p>
+{% endif %}
+
+{% endblock %}

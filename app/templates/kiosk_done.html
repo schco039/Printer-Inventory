@@ -1,0 +1,32 @@
+{% extends "kiosk_base.html" %}
+{% block heading %}Enregistré{% endblock %}
+
+{% block content %}
+
+<div class="k-done">
+  <div class="k-check">✓</div>
+  <p class="k-done-line">
+    <span class="k-sku-big">{{ consumable.sku }}</span>
+    <span class="k-delta {{ 'neg' if delta < 0 else 'pos' }}">{{ '+' if delta > 0 }}{{ delta }}</span>
+  </p>
+  <p class="k-done-stock">Stock : <strong>{{ reste }}</strong></p>
+  {% if user %}<p class="k-done-user">{{ user.nom }}</p>{% endif %}
+  <p class="k-done-back">Retour à l'accueil dans <span id="cd">4</span> s</p>
+  <a class="k-confirm" href="/kiosk">Terminer</a>
+</div>
+
+{% endblock %}
+
+{% block script %}
+<script>
+  (function () {
+    var n = 4;
+    var el = document.getElementById('cd');
+    setInterval(function () {
+      n -= 1;
+      if (el) { el.textContent = n > 0 ? n : 0; }
+      if (n <= 0) { window.location.href = '/kiosk'; }
+    }, 1000);
+  })();
+</script>
+{% endblock %}

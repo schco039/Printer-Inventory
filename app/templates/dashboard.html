@@ -17,9 +17,9 @@
     <span class="num">{{ nb_consumables }}</span>
     <span class="lbl">consommables au catalogue</span>
   </div>
-  <div class="card {{ 'muted' if not nb_absent }}">
-    <span class="num">{{ nb_absent }}</span>
-    <span class="lbl">absentes du dernier export</span>
+  <div class="card {{ 'alert' if ruptures else 'muted' }}">
+    <span class="num">{{ ruptures|length }}</span>
+    <span class="lbl">en rupture</span>
   </div>
 </section>
 
@@ -28,12 +28,55 @@
   <h2>⚠ {{ a_mapper|length }} modèle{{ 's' if a_mapper|length > 1 }} sans consommables</h2>
   <p>
     Ces modèles sont en service mais aucun consommable ne leur est associé.
-    Le kiosque les affichera en grisé tant que ce n'est pas fait.
+    Le kiosque les affiche en grisé tant que ce n'est pas fait.
   </p>
   <ul class="chips">
-    {% for m in a_mapper %}<li>{{ m.libelle }}</li>{% endfor %}
+    {% for m in a_mapper %}
+    <li><a href="/admin/compatibilites/{{ m.id }}">{{ m.libelle }} →</a></li>
+    {% endfor %}
   </ul>
-  <p class="hint">La gestion des consommables arrive en M2.</p>
+</section>
+{% endif %}
+
+{% if ruptures or sous_seuil %}
+<section class="panel">
+  <h2>Stock à surveiller</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Réf.</th><th>Désignation</th><th class="r">Stock</th><th class="r">Seuil</th><th>État</th></tr></thead>
+      <tbody>
+        {% for c in ruptures %}
+        <tr>
+          <td class="mono"><a href="/admin/consommables/{{ c.id }}">{{ c.sku }}</a></td>
+          <td>{{ c.designation }}</td>
+          <td class="r"><strong>{{ stock.get(c.id, 0) }}</strong></td>
+          <td class="r">{{ c.seuil_alerte }}</td>
+          <td><span class="tag red">rupture</span></td>
+        </tr>
+        {% endfor %}
+        {% for c in sous_seuil %}
+        <tr>
+          <td class="mono"><a href="/admin/consommables/{{ c.id }}">{{ c.sku }}</a></td>
+          <td>{{ c.designation }}</td>
+          <td class="r"><strong>{{ stock.get(c.id, 0) }}</strong></td>
+          <td class="r">{{ c.seuil_alerte }}</td>
+          <td><span class="tag orange">sous le seuil</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
+{% if nb_consumables == 0 %}
+<section class="panel todo">
+  <h2>Prochaine étape</h2>
+  <ol class="steps">
+    <li><a href="/admin/compatibilites">Configurer les consommables par modèle</a> — l'assistant crée le jeu complet en une fois</li>
+    <li><a href="/admin/inventaire">Saisir l'inventaire d'ouverture</a> — comptage physique du stock</li>
+    <li>Le <a href="/kiosk" target="_blank" rel="noopener">kiosque</a> est alors utilisable</li>
+  </ol>
 </section>
 {% endif %}
 
@@ -50,6 +93,9 @@
   {% else %}
   <p class="hint">Aucun import effectué. <a href="/admin/import">Téléverser l'export Excel</a>.</p>
   {% endif %}
+  {% if nb_absent %}
+  <p class="hint">{{ nb_absent }} imprimante(s) marquée(s) « absent » — <a href="/admin/imprimantes?etat=absent">voir</a></p>
+  {% endif %}
 </section>
 
 {% if marques %}
@@ -58,9 +104,9 @@
   <ul class="chips">{% for m in marques %}<li>{{ m }}</li>{% endfor %}</ul>
   <p class="hint">
     {% if marques|length == 1 %}
-      Une seule marque : le kiosque démarrera directement sur la liste des modèles.
+      Une seule marque : le kiosque démarre directement sur la liste des modèles.
     {% else %}
-      Plusieurs marques : le kiosque affichera d'abord l'écran « Marque ».
+      Plusieurs marques : le kiosque affiche d'abord l'écran « Marque ».
     {% endif %}
   </p>
 </section>

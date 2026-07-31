@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <title>Consommables — LGK</title>
+  <link rel="stylesheet" href="/static/kiosk.css">
+  <link rel="icon" href="data:,">
+</head>
+<body class="kiosk">
+
+  <header class="k-top">
+    {% block back %}<span class="k-back-placeholder"></span>{% endblock %}
+    <h1>{% block heading %}Consommables{% endblock %}</h1>
+    <span class="k-clock" id="clock"></span>
+  </header>
+
+  <main class="k-main">
+    {% block content %}{% endblock %}
+  </main>
+
+  <script>
+    // Uhr
+    function tick() {
+      var d = new Date();
+      var el = document.getElementById('clock');
+      if (el) {
+        el.textContent = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+      }
+    }
+    tick();
+    setInterval(tick, 10000);
+
+    // Automatischer Rücksprung zum Start nach Untätigkeit.
+    // Bewusst kein Framework: läuft auch auf altem Chromium.
+    (function () {
+      var seconds = {{ idle_reset }};
+      var home = '/kiosk';
+      if (!seconds || window.location.pathname === home) { return; }
+      var timer = null;
+      function reset() {
+        if (timer) { clearTimeout(timer); }
+        timer = setTimeout(function () { window.location.href = home; }, seconds * 1000);
+      }
+      ['touchstart', 'mousedown', 'keydown', 'scroll'].forEach(function (evt) {
+        document.addEventListener(evt, reset, true);
+      });
+      reset();
+    })();
+  </script>
+  {% block script %}{% endblock %}
+</body>
+</html>

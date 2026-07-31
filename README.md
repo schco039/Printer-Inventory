@@ -82,9 +82,15 @@ beim Start automatisch.
 
 ## Erste Schritte
 
-1. `/admin/import` öffnen und den Excel-Export hochladen
-2. Diff-Vorschau prüfen → **Confirmer et appliquer**
-3. `/admin/imprimantes` zeigt den importierten Bestand
+1. **Import** — `/admin/import`, Excel-Export hochladen, Diff-Vorschau prüfen,
+   *Confirmer et appliquer*
+2. **Konfigurieren** — `/admin/compatibilites`, je Modell auf *Configurer*.
+   Der Assistent legt einen kompletten Satz (BK/C/M/Y + Trommel) in einem
+   Schritt an; du tippst nur die Bestellnummern. Teilen sich zwei Modelle
+   dieselben Kartuschen: *Copier depuis un autre modèle*
+3. **Personen** — `/admin/utilisateurs`, wer Material entnehmen darf
+4. **Inventur** — `/admin/inventaire`, Lager zählen und als Anfangsbestand buchen
+5. **Kiosk** — `/kiosk` auf dem Touchscreen, ab jetzt wird gebucht
 
 Der Import schreibt erst nach Bestätigung, ist idempotent (dieselbe Datei
 zweimal ⇒ keine Änderung) und löscht nie einen Drucker — verschwundene Geräte
@@ -92,15 +98,31 @@ werden als `absent` markiert.
 
 ---
 
-## Was funktioniert (Stand M0/M1)
+## Was funktioniert
 
-- Excel-Import mit Diff-Vorschau, Filtern und Historie
-- Druckerliste mit Filtern (Modell, Statut, Suche)
-- Dashboard mit Aufgabenliste „Modelle ohne Verbrauchsmaterial"
-- Datenbank-Schema für alle späteren Meilensteine
+**M0/M1 — Grundlage**
+- Excel-Import mit Diff-Vorschau, Filtern (Zustand + Kategorie) und Historie
+- Druckerliste mit Filtern, Dashboard mit offenen Aufgaben
 
-**Noch nicht:** Verbrauchsmaterial-Verwaltung (M2), Kiosk (M3), Badges (M4),
-Wareneingang (M5), Auswertungen (M6/M7).
+**M2 — Verbrauchsmaterial**
+- Katalog mit Bestand, Mindestbestand, Lagerplatz, EAN
+- Kompatibilitätsmatrix Modell ↔ Material, Assistent und „Copier depuis"
+- Inventur (Eröffnung und Jahreszählung, bucht nur die Differenz)
+- Bewegungshistorie mit Filtern, manuelle Korrekturbuchung
+- Benutzerliste
+
+**M3 — Kiosk**
+- Modell ▸ Farbe ▸ Menge ▸ Person ▸ Buchung, Rückgabe ebenso
+- Markenebene erscheint automatisch ab der zweiten Marke
+- Modelle ohne Material ausgegraut, Bestand 0 gesperrt, Auto-Reset nach 45 s
+
+**Noch nicht:** RFID-Badges (M4), Wareneingang (M5), Bestellvorschlag (M6),
+Saisonauswertung (M7). Bis dahin ersetzt die manuelle Korrekturbuchung unter
+`/admin/mouvements` den Wareneingang.
+
+> Die Personenauswahl am Kiosk ist die Übergangslösung bis M4. Die Buchung
+> selbst ist bereits die endgültige — der Badge ersetzt später nur das
+> Antippen des Namens.
 
 ---
 
@@ -108,13 +130,16 @@ Wareneingang (M5), Auswertungen (M6/M7).
 
 ```
 app/
-  main.py         Routen
+  main.py         App-Zusammenbau
   models.py       Datenmodell (SPEC 4)
   importer.py     Excel-Import (SPEC 5)
+  services.py     Bestand, Buchungen, Schuljahr, Vorschläge
   db.py           Session + Einstellungen
   auth.py         Basic-Auth für /admin (bis M4)
+  routers/        printers · imports · consumables · stock · users · kiosk
   templates/      Jinja2, Oberfläche auf Französisch
-  static/app.css  CSS ohne Framework — läuft auch auf altem Chromium
+  static/app.css  Admin-CSS
+  static/kiosk.css Kiosk-CSS — Touch-Flächen ≥ 64 px, altes Chromium-tauglich
 alembic/          Migrationen
 tests/            pytest
 docker/           Container-Entrypoint

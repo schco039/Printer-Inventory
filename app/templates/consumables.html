@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% set nav = 'consommables' %}
+{% block content %}
+
+<h1>Consommables <span class="count">{{ consumables|length }}</span></h1>
+
+<form class="filters" method="get">
+  <input type="search" name="q" value="{{ q }}" placeholder="Référence ou désignation…">
+  <select name="type">
+    <option value="">Tous les types</option>
+    {% for key, label in type_label.items() %}
+    <option value="{{ key }}" {{ 'selected' if type_filtre == key }}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit">Filtrer</button>
+  <a class="btn primary" href="/admin/consommables/nouveau">+ Nouveau</a>
+</form>
+
+{% if consumables %}
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Réf.</th><th>Désignation</th><th>Type</th><th>Couleur</th>
+        <th class="r">Stock</th><th class="r">Seuil</th><th>Emplacement</th>
+        <th class="r">Modèles</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in consumables %}
+      {% set qte = stock.get(c.id, 0) %}
+      <tr class="{{ 'is-absent' if not c.actif }}">
+        <td class="mono"><a href="/admin/consommables/{{ c.id }}">{{ c.sku }}</a></td>
+        <td>{{ c.designation }}</td>
+        <td>{{ type_label.get(c.type, c.type) }}</td>
+        <td>
+          {% if c.couleur %}
+          <span class="dot dot-{{ c.couleur }}"></span>{{ color_label.get(c.couleur, c.couleur) }}
+          {% else %}—{% endif %}
+        </td>
+        <td class="r">
+          {% if qte <= 0 %}<span class="tag red">{{ qte }}</span>
+          {% elif qte < c.seuil_alerte %}<span class="tag orange">{{ qte }}</span>
+          {% else %}<strong>{{ qte }}</strong>{% endif %}
+        </td>
+        <td class="r">{{ c.seuil_alerte }}</td>
+        <td>{{ c.emplacement or '—' }}</td>
+        <td class="r">{{ links.get(c.id, 0) }}</td>
+        <td><a href="/admin/consommables/{{ c.id }}">Modifier</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<section class="panel todo">
+  <h2>Le catalogue est vide</h2>
+  <p>
+    Le plus rapide est de partir des modèles : l'assistant crée un jeu complet
+    (BK/C/M/Y + tambour) en une seule fois.
+  </p>
+  <p><a class="btn primary" href="/admin/compatibilites">Configurer par modèle →</a></p>
+</section>
+{% endif %}
+
+{% endblock %}

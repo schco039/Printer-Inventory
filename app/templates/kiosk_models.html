@@ -1,0 +1,36 @@
+{% extends "kiosk_base.html" %}
+
+{% block back %}
+  {% if marque %}<a class="k-back" href="/kiosk">‹ Retour</a>{% else %}<span class="k-back-placeholder"></span>{% endif %}
+{% endblock %}
+
+{% block heading %}{{ marque or 'Choisir le modèle' }}{% endblock %}
+
+{% block content %}
+
+{% if models %}
+<ul class="k-list">
+  {% for model, nb in models %}
+  {% if mapping.get(model.id) %}
+  <li>
+    <a href="/kiosk/modele/{{ model.slug }}">
+      <span class="k-name">{{ model.libelle }}</span>
+      <span class="k-meta">{{ nb }} appareil{{ 's' if nb > 1 }}</span>
+      <span class="k-arrow">›</span>
+    </a>
+  </li>
+  {% else %}
+  <li class="k-disabled">
+    <span>
+      <span class="k-name">{{ model.libelle }}</span>
+      <span class="k-meta">⚠ consommables non configurés</span>
+    </span>
+  </li>
+  {% endif %}
+  {% endfor %}
+</ul>
+{% else %}
+<p class="k-empty">Aucun modèle en service. Importez d'abord l'inventaire.</p>
+{% endif %}
+
+{% endblock %}

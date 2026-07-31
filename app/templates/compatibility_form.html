@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% set nav = 'compat' %}
+{% block content %}
+
+<p><a href="/admin/compatibilites">‹ Tous les modèles</a></p>
+<h1>{{ model.libelle }} <span class="count">{{ nb }} appareil{{ 's' if nb > 1 }}</span></h1>
+
+{% if request.query_params.get('ok') %}
+<p class="banner ok">✓ Enregistré.</p>
+{% endif %}
+
+<section class="panel">
+  <h2>Consommables associés</h2>
+  {% if existants %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Réf.</th><th>Désignation</th><th>Couleur</th><th class="r">Stock</th><th></th></tr></thead>
+      <tbody>
+        {% for c in existants %}
+        <tr>
+          <td class="mono"><a href="/admin/consommables/{{ c.id }}">{{ c.sku }}</a></td>
+          <td>{{ c.designation }}</td>
+          <td>
+            {% if c.couleur %}<span class="dot dot-{{ c.couleur }}"></span>{{ color_label.get(c.couleur, c.couleur) }}
+            {% else %}{{ type_label.get(c.type, c.type) }}{% endif %}
+          </td>
+          <td class="r">{{ stock.get(c.id, 0) }}</td>
+          <td class="r">
+            <form method="post" action="/admin/compatibilites/{{ model.id }}/delier">
+              <input type="hidden" name="consumable_id" value="{{ c.id }}">
+              <button type="submit" class="link-btn">Délier</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="hint">Aucun consommable associé pour l'instant.</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>Assistant</h2>
+
+  {% if not jeu %}
+  <p class="hint">Choisissez le type de jeu à créer :</p>
+  <div class="choices">
+    <a class="choice" href="?jeu=cmyk">
+      <strong>Couleur CMYK + tambour</strong>
+      <span>5 références : noir, cyan, magenta, jaune, tambour</span>
+    </a>
+    <a class="choice" href="?jeu=mono">
+      <strong>Monochrome + tambour</strong>
+      <span>2 références : noir, tambour</span>
+    </a>
+    <a class="choice" href="?jeu=encre">
+      <strong>Encre (traceur)</strong>
+      <span>4 cartouches d'encre</span>
+    </a>
+    <a class="choice" href="?jeu=libre">
+      <strong>Libre</strong>
+      <span>3 lignes vides, type et couleur au choix</span>
+    </a>
+  </div>
+
+  {% if autres_modeles %}
+  <hr>
+  <form method="post" action="/admin/compatibilites/{{ model.id }}/copier" class="inline-form">
+    <label>
+      <span>Ou copier depuis un autre modèle</span>
+      <select name="source_id">
+        {% for m in autres_modeles %}
+        <option value="{{ m.id }}">{{ m.libelle }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit">Copier</button>
+  </form>
+  <p class="hint">
+    Utile quand deux modèles partagent les mêmes cartouches — les consommables
+    ne sont pas dupliqués, seulement associés.
+  </p>
+  {% endif %}
+
+  {% else %}
+  <form method="post" action="/admin/compatibilites/{{ model.id }}/assistant">
+    <p class="hint">
+      Saisissez les références lues sur les emballages. La désignation est
+      générée automatiquement si vous la laissez vide. Les lignes sans
+      référence sont ignorées.
+    </p>
+    <div class="table-wrap">
+      <table class="assist">
+        <thead><tr><th>Position</th><th>Référence</th><th>Désignation</th><th class="r">Seuil</th></tr></thead>
+        <tbody>
+          {% for l in lignes %}
+          <tr>
+            <td>
+              {% if l.couleur %}<span class="dot dot-{{ l.couleur }}"></span>{% endif %}
+              <strong>{{ l.label }}</strong>
+              <input type="hidden" name="type" value="{{ l.type }}">
+              {% if jeu == 'libre' %}
+              <select name="couleur">
+                <option value="">— aucune —</option>
+                {% for key, label in color_label.items() %}
+                <option value="{{ key }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+              {% else %}
+              <input type="hidden" name="couleur" value="{{ l.couleur }}">
+              {% endif %}
+            </td>
+            <td><input type="text" name="sku" placeholder="TN-423BK" class="mono"></td>
+            <td><input type="text" name="designation" placeholder="(automatique)"></td>
+            <td class="r"><input type="number" name="seuil" value="{{ l.seuil }}" min="0" class="tiny"></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="hint">
+      ℹ Seuils proposés : {{ nb }} appareil{{ 's' if nb > 1 }} ÷ {{ reserve }} = {{ seuil }} (modifiable)
+    </p>
+    <div class="actions">
+      <a class="btn" href="/admin/compatibilites/{{ model.id }}">Annuler</a>
+      <button type="submit" class="primary">Enregistrer</button>
+    </div>
+  </form>
+  {% endif %}
+</section>
+
+{% if catalogue %}
+<section class="panel">
+  <h2>Associer un consommable existant</h2>
+  <form method="post" action="/admin/compatibilites/{{ model.id }}/lier" class="inline-form">
+    <select name="consumable_id">
+      {% for c in catalogue %}
+      <option value="{{ c.id }}">{{ c.sku }} — {{ c.designation }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit">Associer</button>
+  </form>
+</section>
+{% endif %}
+
+{% endblock %}

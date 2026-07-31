@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% set nav = 'inventaire' %}
+{% block content %}
+
+<h1>{{ "Inventaire d'ouverture" if premier else "Comptage d'inventaire" }}</h1>
+
+{% if premier %}
+<p class="banner warn">
+  Premier comptage : les quantités saisies deviennent le stock de départ.
+  Choisissez la date du comptage physique — par exemple le 1<sup>er</sup> septembre,
+  début de l'année scolaire.
+</p>
+{% else %}
+<p class="hint">
+  Seul l'écart entre le stock théorique et le comptage est enregistré.
+  Une ligne laissée vide n'est pas touchée.
+</p>
+{% endif %}
+
+{% if consumables %}
+<form method="post" class="panel">
+  <div class="grid2">
+    <label>
+      <span>Date du comptage</span>
+      <input type="date" name="date_comptage" value="{{ aujourdhui }}" required>
+    </label>
+    <label>
+      <span>Note (facultatif)</span>
+      <input type="text" name="note" placeholder="Comptage annuel, salle de stockage…">
+    </label>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Réf.</th><th>Désignation</th><th>Couleur</th><th class="r">Théorique</th><th class="r">Compté</th></tr>
+      </thead>
+      <tbody>
+        {% for c in consumables %}
+        <tr>
+          <td class="mono">{{ c.sku }}<input type="hidden" name="consumable_id" value="{{ c.id }}"></td>
+          <td>{{ c.designation }}</td>
+          <td>
+            {% if c.couleur %}<span class="dot dot-{{ c.couleur }}"></span>{{ color_label.get(c.couleur, c.couleur) }}
+            {% else %}—{% endif %}
+          </td>
+          <td class="r">{{ '—' if premier else stock.get(c.id, 0) }}</td>
+          <td class="r"><input type="number" name="compte" min="0" class="tiny" inputmode="numeric"></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="actions">
+    <button type="submit" class="primary">Enregistrer le comptage</button>
+  </div>
+</form>
+{% else %}
+<section class="panel todo">
+  <h2>Aucun consommable au catalogue</h2>
+  <p>Configurez d'abord les consommables par modèle.</p>
+  <p><a class="btn primary" href="/admin/compatibilites">Compatibilités →</a></p>
+</section>
+{% endif %}
+
+{% endblock %}
