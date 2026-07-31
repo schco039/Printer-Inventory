@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Consommables — LGK{% endblock %}</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <link rel="icon" href="data:,">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/admin">Consommables <span>LGK</span></a>
+    <nav>
+      <a href="/admin" class="{{ 'on' if nav == 'dashboard' }}">Tableau de bord</a>
+      <a href="/admin/imprimantes" class="{{ 'on' if nav == 'printers' }}">Imprimantes</a>
+      <a href="/admin/import" class="{{ 'on' if nav == 'import' }}">Import</a>
+    </nav>
+  </header>
+
+  {% if not admin_protected() %}
+  <p class="banner warn">
+    ⚠ Aucun mot de passe administrateur n'est configuré — cette interface est
+    accessible à tous. Définissez <code>ADMIN_PASSWORD</code> dans le fichier
+    <code>.env</code>, puis redémarrez.
+  </p>
+  {% endif %}
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer>
+    <span>LGK — gestion des consommables d'impression</span>
+    <span>M0/M1 · voir <code>docs/SPEC.md</code></span>
+  </footer>
+</body>
+</html>

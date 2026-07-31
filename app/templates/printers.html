@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% set nav = 'printers' %}
+{% block content %}
+
+<h1>Imprimantes <span class="count">{{ printers|length }}</span></h1>
+
+<form class="filters" method="get">
+  <input type="search" name="q" value="{{ q }}" placeholder="Nom, S/N, CGIE, salle…">
+  <select name="modele">
+    <option value="">Tous les modèles</option>
+    {% for m in models %}
+    <option value="{{ m.slug }}" {{ 'selected' if modele == m.slug }}>{{ m.libelle }}</option>
+    {% endfor %}
+  </select>
+  <select name="statut">
+    <option value="">Tous statuts</option>
+    <option value="installe" {{ 'selected' if statut == 'installe' }}>Installée</option>
+    <option value="entrepot" {{ 'selected' if statut == 'entrepot' }}>Entrepôt</option>
+  </select>
+  <select name="etat">
+    <option value="actif" {{ 'selected' if etat == 'actif' }}>Actives</option>
+    <option value="absent" {{ 'selected' if etat == 'absent' }}>Absentes</option>
+    <option value="" {{ 'selected' if etat == '' }}>Toutes</option>
+  </select>
+  <button type="submit">Filtrer</button>
+</form>
+
+{% if printers %}
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Nom</th><th>Modèle</th><th>Salle</th><th>Statut</th>
+        <th>S/N</th><th>CGIE</th><th>IP</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in printers %}
+      <tr class="{{ 'is-absent' if p.etat == 'absent' }}">
+        <td>{{ p.nom }}</td>
+        <td>{{ p.model.libelle }}</td>
+        <td>{{ p.salle or '—' }}</td>
+        <td>
+          {% if p.etat == 'absent' %}<span class="tag grey">absente</span>
+          {% elif p.statut == 'entrepot' %}<span class="tag blue">entrepôt</span>
+          {% else %}<span class="tag green">installée</span>{% endif %}
+        </td>
+        <td class="mono">{{ p.serial or '—' }}</td>
+        <td class="mono">{{ p.cgie or '—' }}</td>
+        <td class="mono">{{ p.ip or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="hint">Aucune imprimante. <a href="/admin/import">Téléverser l'export Excel</a>.</p>
+{% endif %}
+
+{% endblock %}

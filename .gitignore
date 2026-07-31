@@ -1,0 +1,21 @@
+# Geheimnisse und Daten gehören nie ins Repository
+.env
+data/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# Editor / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+
+# Excel-Exporte nicht versehentlich einchecken (enthalten Inventardaten)
+*.xlsx
+*.xlsm
+!tests/fixtures/*.xlsx

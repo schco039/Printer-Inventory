@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% set nav = 'dashboard' %}
+{% block content %}
+
+<h1>Tableau de bord</h1>
+
+<section class="cards">
+  <div class="card">
+    <span class="num">{{ nb_printers }}</span>
+    <span class="lbl">imprimantes actives</span>
+  </div>
+  <div class="card">
+    <span class="num">{{ nb_entrepot }}</span>
+    <span class="lbl">en entrepôt (non installées)</span>
+  </div>
+  <div class="card">
+    <span class="num">{{ nb_consumables }}</span>
+    <span class="lbl">consommables au catalogue</span>
+  </div>
+  <div class="card {{ 'muted' if not nb_absent }}">
+    <span class="num">{{ nb_absent }}</span>
+    <span class="lbl">absentes du dernier export</span>
+  </div>
+</section>
+
+{% if a_mapper %}
+<section class="panel todo">
+  <h2>⚠ {{ a_mapper|length }} modèle{{ 's' if a_mapper|length > 1 }} sans consommables</h2>
+  <p>
+    Ces modèles sont en service mais aucun consommable ne leur est associé.
+    Le kiosque les affichera en grisé tant que ce n'est pas fait.
+  </p>
+  <ul class="chips">
+    {% for m in a_mapper %}<li>{{ m.libelle }}</li>{% endfor %}
+  </ul>
+  <p class="hint">La gestion des consommables arrive en M2.</p>
+</section>
+{% endif %}
+
+<section class="panel">
+  <h2>Dernier import</h2>
+  {% if last_import %}
+  <p>
+    <strong>{{ last_import.filename }}</strong> —
+    {{ last_import.imported_at.strftime('%d.%m.%Y %H:%M') }}<br>
+    {{ last_import.rows_kept }} imprimantes retenues sur {{ last_import.rows_total }} lignes ·
+    {{ last_import.nb_created }} créées · {{ last_import.nb_updated }} modifiées ·
+    {{ last_import.nb_absent }} absentes
+  </p>
+  {% else %}
+  <p class="hint">Aucun import effectué. <a href="/admin/import">Téléverser l'export Excel</a>.</p>
+  {% endif %}
+</section>
+
+{% if marques %}
+<section class="panel">
+  <h2>Marques en service</h2>
+  <ul class="chips">{% for m in marques %}<li>{{ m }}</li>{% endfor %}</ul>
+  <p class="hint">
+    {% if marques|length == 1 %}
+      Une seule marque : le kiosque démarrera directement sur la liste des modèles.
+    {% else %}
+      Plusieurs marques : le kiosque affichera d'abord l'écran « Marque ».
+    {% endif %}
+  </p>
+</section>
+{% endif %}
+
+{% endblock %}

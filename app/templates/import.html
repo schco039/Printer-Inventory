@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% set nav = 'import' %}
+{% block content %}
+
+<h1>Import de l'inventaire</h1>
+
+{% if request.query_params.get('ok') %}
+<p class="banner ok">✓ Import n° {{ request.query_params.get('ok') }} appliqué.</p>
+{% endif %}
+{% if erreur %}
+<p class="banner err">✕ {{ erreur }}</p>
+{% endif %}
+
+<section class="panel">
+  <form method="post" enctype="multipart/form-data">
+    <label class="filefield">
+      <span>Export Excel du programme d'inventaire (.xlsx)</span>
+      <input type="file" name="fichier" accept=".xlsx,.xlsm" required>
+    </label>
+    <button type="submit" class="primary">Analyser le fichier</button>
+    <p class="hint">
+      Rien n'est écrit à cette étape : un aperçu des modifications s'affiche
+      d'abord. Catégories exclues actuellement :
+      {{ excluded|join(', ') if excluded else 'aucune' }}
+      (10246 = imprimantes 3D, 132 = imprimantes à cartes myCard).
+    </p>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>Historique</h2>
+  {% if runs %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th><th>Date</th><th>Fichier</th><th>Retenues</th>
+          <th>Créées</th><th>Modifiées</th><th>Absentes</th><th>Nouv. modèles</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in runs %}
+        <tr>
+          <td>{{ r.id }}</td>
+          <td>{{ r.imported_at.strftime('%d.%m.%Y %H:%M') }}</td>
+          <td>{{ r.filename }}</td>
+          <td>{{ r.rows_kept }} / {{ r.rows_total }}</td>
+          <td>{{ r.nb_created }}</td>
+          <td>{{ r.nb_updated }}</td>
+          <td>{{ r.nb_absent }}</td>
+          <td>{{ r.nb_new_models }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="hint">Aucun import pour l'instant.</p>
+  {% endif %}
+</section>
+
+{% endblock %}

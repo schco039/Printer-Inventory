@@ -1,0 +1,15 @@
+services:
+  app:
+    build: .
+    image: lgk-printer:latest
+    container_name: lgk-printer
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATA_DIR: /data
+      TZ: ${TZ:-Europe/Luxembourg}
+    volumes:
+      # Datenbank, Uploads und Backups liegen auf dem Host — Container ist wegwerfbar
+      - ./data:/data
+    ports:
+      - "${APP_PORT:-8080}:8000"

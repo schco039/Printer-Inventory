@@ -1,0 +1,16 @@
+.git
+.gitignore
+.venv
+data
+docs
+tests
+.env
+.env.example
+.pytest_cache
+__pycache__
+**/__pycache__
+*.xlsx
+*.md
+install.sh
+install.ps1
+run.ps1

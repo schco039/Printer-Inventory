@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% set nav = 'import' %}
+{% block content %}
+
+<h1>Aperçu de l'import</h1>
+<p class="hint">Fichier : <strong>{{ filename }}</strong> — rien n'a encore été enregistré.</p>
+
+<section class="panel">
+  <h2>Lignes lues</h2>
+  <table class="summary">
+    <tr><td class="num">{{ plan.rows_total }}</td><td>lignes dans le fichier</td></tr>
+    <tr class="keep"><td class="num">{{ plan.rows_kept }}</td><td>retenues</td></tr>
+    <tr><td class="num">{{ plan.rows_state_filtered }}</td><td>ignorées — remplacé / volé / hors service</td></tr>
+    <tr>
+      <td class="num">{{ plan.rows_category_filtered }}</td>
+      <td>
+        ignorées — catégorie exclue
+        {% if plan.category_filtered_detail %}
+        ({% for label, n in plan.category_filtered_detail.items() %}{{ n }} × {{ label }}{{ ', ' if not loop.last }}{% endfor %})
+        {% endif %}
+      </td>
+    </tr>
+  </table>
+</section>
+
+<section class="panel">
+  <h2>Modifications</h2>
+  <ul class="diff">
+    <li class="add"><strong>{{ plan.created|length }}</strong> nouvelle{{ 's' if plan.created|length > 1 }} imprimante{{ 's' if plan.created|length > 1 }}</li>
+    <li class="chg"><strong>{{ plan.updated|length }}</strong> modifiée{{ 's' if plan.updated|length > 1 }}</li>
+    <li class="del"><strong>{{ plan.absent|length }}</strong> absente{{ 's' if plan.absent|length > 1 }} de cet export → marquée{{ 's' if plan.absent|length > 1 }} « absent »</li>
+  </ul>
+
+  {% if plan.new_brands %}
+  <p class="banner warn">
+    ⚠ Nouvelle{{ 's' if plan.new_brands|length > 1 }} marque{{ 's' if plan.new_brands|length > 1 }} :
+    <strong>{{ plan.new_brands|join(', ') }}</strong> — le kiosque affichera désormais l'écran « Marque ».
+  </p>
+  {% endif %}
+
+  {% if plan.new_models %}
+  <p class="banner warn">
+    ⚠ {{ plan.new_models|length }} nouveau{{ 'x' if plan.new_models|length > 1 }} modèle{{ 's' if plan.new_models|length > 1 }}
+    sans consommable associé : {{ plan.new_models|join(', ') }}.
+    À compléter dans « Compatibilités » après l'import.
+  </p>
+  {% endif %}
+</section>
+
+{% if plan.created %}
+<details class="panel" open>
+  <summary>Nouvelles imprimantes ({{ plan.created|length }})</summary>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Nom</th><th>Modèle</th><th>Salle</th><th>Statut</th><th>S/N</th></tr></thead>
+      <tbody>
+        {% for r in plan.created %}
+        <tr>
+          <td>{{ r.nom }}</td>
+          <td>{{ r.marque }} {{ r.modele }}</td>
+          <td>{{ r.salle or '—' }}</td>
+          <td>{{ 'entrepôt' if r.statut == 'entrepot' else 'installée' }}</td>
+          <td class="mono">{{ r.serial or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</details>
+{% endif %}
+
+{% if plan.updated %}
+<details class="panel">
+  <summary>Imprimantes modifiées ({{ plan.updated|length }})</summary>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Imprimante</th><th>Champ</th><th>Avant</th><th>Après</th></tr></thead>
+      <tbody>
+        {% for row, changes in plan.updated %}
+          {% for c in changes %}
+          <tr>
+            <td>{{ row.nom if loop.first }}</td>
+            <td>{{ c.champ }}</td>
+            <td class="before">{{ c.avant or '—' }}</td>
+            <td class="after">{{ c.apres or '—' }}</td>
+          </tr>
+          {% endfor %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</details>
+{% endif %}
+
+{% if plan.absent %}
+<details class="panel">
+  <summary>Absentes de cet export ({{ plan.absent|length }})</summary>
+  <p class="hint">Ces imprimantes ne sont pas supprimées, seulement marquées « absent ».</p>
+  <ul class="chips">{% for nom in plan.absent %}<li>{{ nom }}</li>{% endfor %}</ul>
+</details>
+{% endif %}
+
+<form method="post" action="/admin/import/{{ token }}/appliquer" class="actions">
+  <input type="hidden" name="filename" value="{{ filename }}">
+  <a href="/admin/import" class="btn">Annuler</a>
+  <button type="submit" class="primary" {{ 'disabled' if not plan.has_changes }}>
+    {% if plan.has_changes %}Confirmer et appliquer{% else %}Aucune modification{% endif %}
+  </button>
+</form>
+
+{% endblock %}
