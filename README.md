@@ -7,6 +7,30 @@ Vollständige Spezifikation: **[docs/SPEC.md](docs/SPEC.md)**
 
 ---
 
+## Einmalig: privates Repository anlegen
+
+Das Projekt ist bereits ein Git-Repository mit einem ersten Commit. Es fehlt
+nur die Gegenstelle. Mit GitHub CLI:
+
+```bash
+gh repo create lgk-printer --private --source=. --remote=origin --push
+```
+
+Oder von Hand — leeres **privates** Repository bei GitHub/GitLab anlegen, dann:
+
+```bash
+git remote add origin <REPO-URL>
+git push -u origin main
+```
+
+Danach lässt es sich auf jedem Rechner in der Schule klonen und installieren.
+
+> **Privat lassen.** Im Repository stehen keine Passwörter (`.env` und `data/`
+> sind ausgeschlossen), aber Raumnamen, Seriennummern und die Inventarstruktur
+> der Schule gehören nicht in ein öffentliches Repository.
+
+---
+
 ## Installation
 
 ### Linux, macOS, NAS, Raspberry Pi
