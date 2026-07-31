@@ -118,6 +118,8 @@ class Consumable(Base):
     emplacement: Mapped[str | None] = mapped_column(String(60))
     seuil_alerte: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     actif: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    # Für die Gruppierung des Bestellvorschlags (M6)
+    fournisseur: Mapped[str | None] = mapped_column(String(255))
 
 
 class ModelConsumable(Base):

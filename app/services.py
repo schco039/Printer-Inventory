@@ -152,6 +152,9 @@ def suggest_seuil(nb_printers: int, reserve_factor: int) -> int:
 COLOR_ORDER = {"BK": 0, "C": 1, "M": 2, "Y": 3}
 COLOR_LABEL = {"BK": "Noir", "C": "Cyan", "M": "Magenta", "Y": "Jaune"}
 
+MOIS_COURTS = ["JAN", "FÉV", "MAR", "AVR", "MAI", "JUN",
+               "JUL", "AOÛ", "SEP", "OCT", "NOV", "DÉC"]
+
 
 def kiosk_groups(session: Session, model_id: int) -> list[dict]:
     """Material eines Modells nach Farbe gruppiert.
@@ -187,3 +190,105 @@ def kiosk_groups(session: Session, model_id: int) -> list[dict]:
         group["total"] += qte
 
     return sorted(groups.values(), key=lambda g: g["order"])
+
+
+# ─────────────────────────── Saison (M7) ─────────────────────────────
+
+
+def month_order(start_month: int) -> list[int]:
+    """Monatsreihenfolge des Schuljahres: [9, 10, …, 12, 1, …, 8]."""
+    return [((start_month - 1 + i) % 12) + 1 for i in range(12)]
+
+
+def consumption_by_month(session: Session) -> dict[tuple[int, str, int], int]:
+    """{(consumable_id, annee_scolaire, monat): Entnahmen}."""
+    rows = session.execute(
+        select(Movement.consumable_id, Movement.annee_scolaire, Movement.mois, func.sum(-Movement.delta))
+        .where(Movement.motif == "retrait")
+        .group_by(Movement.consumable_id, Movement.annee_scolaire, Movement.mois)
+    ).all()
+    out: dict[tuple[int, str, int], int] = {}
+    for cid, annee, mois, total in rows:
+        month = int(str(mois)[5:7])
+        out[(cid, annee, month)] = out.get((cid, annee, month), 0) + int(total or 0)
+    return out
+
+
+def school_years(session: Session) -> list[str]:
+    rows = session.scalars(
+        select(Movement.annee_scolaire).where(Movement.motif == "retrait").distinct()
+    ).all()
+    return sorted(set(rows))
+
+
+def seasonal_factors(session: Session, consumable_id: int, start_month: int) -> dict[int, float]:
+    """Faktor je Monat: Verbrauch dieses Monats ÷ Durchschnitt aller Monate.
+
+    Über alle vollständigen Schuljahre gemittelt. Werte > 1 markieren
+    Spitzenmonate. Ohne Daten kommt ein leeres Ergebnis zurück — die
+    Oberfläche zeigt dann bewusst keine Prognose.
+    """
+    data = consumption_by_month(session)
+    par_mois: dict[int, list[int]] = {m: [] for m in range(1, 13)}
+    annees = {annee for (cid, annee, _m) in data if cid == consumable_id}
+    if not annees:
+        return {}
+
+    for annee in annees:
+        for month in range(1, 13):
+            par_mois[month].append(data.get((consumable_id, annee, month), 0))
+
+    moyennes = {m: (sum(v) / len(v) if v else 0.0) for m, v in par_mois.items()}
+    total = sum(moyennes.values())
+    if total <= 0:
+        return {}
+    moyenne_globale = total / 12
+    return {m: (moyennes[m] / moyenne_globale if moyenne_globale else 0.0) for m in range(1, 13)}
+
+
+def order_proposals(session: Session) -> list[dict]:
+    """Bestellvorschlag je Material (M6), mit saisonalem Aufschlag (M7)."""
+    reserve = int(get_setting(session, "reserve_factor") or 10)
+    start_month = int(get_setting(session, "school_year_start_month") or 9)
+    prochain_mois = (date.today().month % 12) + 1
+
+    stock = stock_map(session)
+    counts = printer_counts(session)
+
+    # Wie viele Geräte nutzen dieses Material?
+    rows = session.execute(
+        select(ModelConsumable.consumable_id, ModelConsumable.model_id)
+    ).all()
+    appareils: dict[int, int] = {}
+    for cid, mid in rows:
+        appareils[cid] = appareils.get(cid, 0) + counts.get(mid, 0)
+
+    proposals = []
+    for consumable in session.scalars(select(Consumable).where(Consumable.actif == 1)).all():
+        nb = appareils.get(consumable.id, 0)
+        base = max(consumable.seuil_alerte, suggest_seuil(nb, reserve) if nb else 0)
+
+        facteurs = seasonal_factors(session, consumable.id, start_month)
+        facteur = facteurs.get(prochain_mois, 1.0) if facteurs else 1.0
+        cible = max(base, round(base * facteur)) if base else 0
+
+        qte = stock.get(consumable.id, 0)
+        manque = max(0, cible - qte)
+        if manque <= 0:
+            continue
+
+        proposals.append(
+            {
+                "consumable": consumable,
+                "stock": qte,
+                "appareils": nb,
+                "base": base,
+                "cible": cible,
+                "manque": manque,
+                "facteur": facteur if facteurs else None,
+                "saison": bool(facteurs),
+            }
+        )
+
+    proposals.sort(key=lambda p: (p["consumable"].fournisseur or "zzz", -p["manque"]))
+    return proposals

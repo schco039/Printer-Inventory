@@ -12,9 +12,12 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from sqlalchemy import or_
+
 from app.db import get_session, get_setting
 from app.deps import templates
 from app.models import AppUser, Consumable, Printer, PrinterModel
+from app.security import badge_hash
 from app.services import kiosk_groups, record_movement, stock_for
 
 router = APIRouter()
@@ -101,6 +104,51 @@ def by_model(slug: str, request: Request, session: Session = Depends(get_session
     )
 
 
+def _badge_mode(session: Session) -> bool:
+    """Badge-Modus, sobald mindestens eine Karte angelernt ist (M4).
+
+    Vorher — und wenn kein Badge angelernt ist — bleibt die Namensliste
+    stehen, damit das System auch am ersten Tag benutzbar ist.
+    """
+    return bool(
+        session.scalar(
+            select(AppUser.id)
+            .where(
+                AppUser.actif == 1,
+                or_(AppUser.mycard_hash.is_not(None), AppUser.salto_hash.is_not(None)),
+            )
+            .limit(1)
+        )
+    )
+
+
+def _confirm_page(
+    request: Request,
+    session: Session,
+    consumable: Consumable,
+    sens: str,
+    erreur: str | None = None,
+    status_code: int = 200,
+) -> HTMLResponse:
+    users = list(
+        session.scalars(select(AppUser).where(AppUser.actif == 1).order_by(AppUser.nom)).all()
+    )
+    return templates.TemplateResponse(
+        request,
+        "kiosk_confirm.html",
+        _ctx(
+            session,
+            consumable=consumable,
+            qte=stock_for(session, consumable.id),
+            users=users,
+            badge_mode=_badge_mode(session),
+            sens=sens if sens in ("sortie", "retour") else "sortie",
+            erreur=erreur,
+        ),
+        status_code=status_code,
+    )
+
+
 @router.get("/kiosk/retrait/{consumable_id}", response_class=HTMLResponse)
 def confirm_form(
     consumable_id: int,
@@ -111,21 +159,7 @@ def confirm_form(
     consumable = session.get(Consumable, consumable_id)
     if consumable is None:
         raise HTTPException(status_code=404, detail="Consommable inconnu")
-
-    users = list(
-        session.scalars(select(AppUser).where(AppUser.actif == 1).order_by(AppUser.nom)).all()
-    )
-    return templates.TemplateResponse(
-        request,
-        "kiosk_confirm.html",
-        _ctx(
-            session,
-            consumable=consumable,
-            qte=stock_for(session, consumable_id),
-            users=users,
-            sens=sens if sens in ("sortie", "retour") else "sortie",
-        ),
-    )
+    return _confirm_page(request, session, consumable, sens)
 
 
 @router.post("/kiosk/retrait")
@@ -135,6 +169,7 @@ def book(
     consumable_id: int = Form(...),
     quantite: int = Form(1),
     user_id: int = Form(0),
+    badge: str = Form(""),
     sens: str = Form("sortie"),
 ) -> Response:
     consumable = session.get(Consumable, consumable_id)
@@ -144,28 +179,42 @@ def book(
     quantite = max(1, min(quantite, 99))
     stock = stock_for(session, consumable_id)
 
+    # Person bestimmen: Badge hat Vorrang, sonst Auswahl aus der Liste
+    user: AppUser | None = None
+    badge_type: str | None = None
+    if badge.strip():
+        digest = badge_hash(badge)
+        user = session.scalar(
+            select(AppUser).where(
+                AppUser.actif == 1,
+                or_(AppUser.mycard_hash == digest, AppUser.salto_hash == digest),
+            )
+        )
+        if user is None:
+            return _confirm_page(
+                request, session, consumable, sens,
+                erreur="Badge inconnu. Faites-le enregistrer par l'administrateur.",
+                status_code=403,
+            )
+        badge_type = "mycard" if user.mycard_hash == digest else "salto"
+    elif user_id:
+        user = session.get(AppUser, user_id)
+    elif _badge_mode(session):
+        return _confirm_page(
+            request, session, consumable, sens,
+            erreur="Présentez votre badge pour confirmer.",
+            status_code=400,
+        )
+
     if sens == "retour":
         delta, motif = quantite, "retour"
     else:
         delta, motif = -quantite, "retrait"
         if stock - quantite < 0:
             # Negativbestand blockieren (SPEC 12, offener Punkt 6)
-            users = list(
-                session.scalars(
-                    select(AppUser).where(AppUser.actif == 1).order_by(AppUser.nom)
-                ).all()
-            )
-            return templates.TemplateResponse(
-                request,
-                "kiosk_confirm.html",
-                _ctx(
-                    session,
-                    consumable=consumable,
-                    qte=stock,
-                    users=users,
-                    sens="sortie",
-                    erreur=f"Stock insuffisant : il ne reste que {stock}.",
-                ),
+            return _confirm_page(
+                request, session, consumable, sens,
+                erreur=f"Stock insuffisant : il ne reste que {stock}.",
                 status_code=400,
             )
 
@@ -174,11 +223,10 @@ def book(
         consumable_id=consumable_id,
         delta=delta,
         motif=motif,
-        user_id=user_id or None,
+        user_id=user.id if user else None,
+        badge_type=badge_type,
     )
     session.commit()
-
-    user = session.get(AppUser, user_id) if user_id else None
     return templates.TemplateResponse(
         request,
         "kiosk_done.html",

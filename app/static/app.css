@@ -219,3 +219,24 @@ td.neg { color: var(--err); font-weight: 600; }
 
 .steps { margin: 0; padding-left: 20px; }
 .steps li { margin-bottom: 6px; }
+
+/* ── M4–M7: Badges, Heatmap ─────────────────────────────────────── */
+
+.topbar nav { gap: 14px; font-size: 14px; }
+
+.user-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.user-head h2 { margin: 0; }
+.push-right { margin-left: auto; }
+.panel.is-inactive { opacity: .6; }
+
+table.badges td { border: none; padding: 6px 12px 6px 0; vertical-align: middle; }
+.badge-name { font-weight: 600; width: 120px; }
+.badge-input { min-width: 260px; }
+
+/* Heatmap: Intensität je Zeile normiert (0–4) */
+table.heat td { font-variant-numeric: tabular-nums; }
+.heat-0 { background: transparent; color: var(--muted); }
+.heat-1 { background: #e8f0fa; }
+.heat-2 { background: #c7dcf4; }
+.heat-3 { background: #9dc2ea; }
+.heat-4 { background: #6da6e0; font-weight: 700; }

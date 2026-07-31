@@ -27,8 +27,17 @@
   </div>
 
   <div class="k-who">
+    {% if badge_mode %}
     <span class="k-label">Qui ?</span>
-    {% if users %}
+    <div class="k-badge">
+      <div class="k-badge-icon">▮▮▮</div>
+      <p class="k-badge-text">Présentez votre badge sur le lecteur</p>
+      <input type="password" name="badge" id="badge" autocomplete="off"
+             autofocus inputmode="none" class="k-badge-input">
+      <p class="k-hint">myCard ou Salto — les deux fonctionnent.</p>
+    </div>
+    {% elif users %}
+    <span class="k-label">Qui ?</span>
     <div class="k-people">
       {% for u in users %}
       <label class="k-person">
@@ -37,7 +46,7 @@
       </label>
       {% endfor %}
     </div>
-    <p class="k-hint">Le badge myCard / Salto remplacera cette liste (M4).</p>
+    <p class="k-hint">Aucun badge enregistré : la personne se choisit dans la liste.</p>
     {% else %}
     <input type="hidden" name="user_id" value="0">
     <p class="k-hint">Aucune personne enregistrée — le mouvement sera anonyme.</p>
@@ -60,5 +69,16 @@
     if (v > 99) { v = 99; }
     input.value = v;
   }
+
+  // Der RFID-Leser meldet sich als Tastatur und tippt die UID gefolgt von
+  // Enter. Das Feld bleibt deshalb dauerhaft fokussiert.
+  (function () {
+    var badge = document.getElementById('badge');
+    if (!badge) { return; }
+    function focusBadge() { try { badge.focus(); } catch (e) {} }
+    focusBadge();
+    setInterval(focusBadge, 800);
+    document.addEventListener('click', focusBadge, true);
+  })();
 </script>
 {% endblock %}

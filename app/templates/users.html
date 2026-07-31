@@ -4,13 +4,23 @@
 
 <h1>Utilisateurs <span class="count">{{ users|length }}</span></h1>
 
+{% if erreur %}<p class="banner err">✕ {{ erreur }}</p>{% endif %}
+
 <p class="hint">
-  Les personnes qui retirent du matériel au kiosque. Les badges (myCard et
-  Salto) seront ajoutés en M4 — d'ici là, la personne se choisit dans une liste.
+  Les personnes qui retirent du matériel au kiosque. Chacune peut avoir deux
+  badges : myCard <strong>et</strong> Salto. Seule une empreinte
+  (HMAC-SHA256) est enregistrée — jamais le numéro de la carte.
 </p>
 
+{% if not nb_badges and users %}
+<p class="banner warn">
+  Aucun badge enregistré : le kiosque affiche encore la liste des noms.
+  Dès qu'un badge est enregistré, il passe automatiquement en mode badge.
+</p>
+{% endif %}
+
 <section class="panel">
-  <h2>Ajouter</h2>
+  <h2>Ajouter une personne</h2>
   <form method="post" class="inline-form">
     <input type="hidden" name="user_id" value="0">
     <label class="grow">
@@ -28,34 +38,57 @@
   </form>
 </section>
 
-{% if users %}
-<div class="table-wrap">
-  <table>
-    <thead><tr><th>Nom</th><th>Rôle</th><th>myCard</th><th>Salto</th><th class="r">Mouvements</th><th>État</th><th></th></tr></thead>
-    <tbody>
-      {% for u in users %}
-      <tr class="{{ 'is-absent' if not u.actif }}">
-        <td>{{ u.nom }}</td>
-        <td>{{ 'Administrateur' if u.role == 'admin' else 'Utilisateur' }}</td>
-        <td>{{ '●' if u.mycard_hash else '○' }}</td>
-        <td>{{ '●' if u.salto_hash else '○' }}</td>
-        <td class="r">{{ counts.get(u.id, 0) }}</td>
-        <td>{% if u.actif %}<span class="tag green">actif</span>{% else %}<span class="tag grey">inactif</span>{% endif %}</td>
-        <td class="r">
-          <form method="post" class="inline-form">
-            <input type="hidden" name="user_id" value="{{ u.id }}">
-            <input type="hidden" name="nom" value="{{ u.nom }}">
-            <input type="hidden" name="role" value="{{ u.role }}">
-            <input type="hidden" name="actif" value="{{ '0' if u.actif else '1' }}">
-            <button type="submit" class="link-btn">{{ 'Désactiver' if u.actif else 'Réactiver' }}</button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
+{% for u in users %}
+<section class="panel {{ 'is-inactive' if not u.actif }}">
+  <div class="user-head">
+    <h2>{{ u.nom }}</h2>
+    <span class="tag {{ 'green' if u.actif else 'grey' }}">{{ 'actif' if u.actif else 'inactif' }}</span>
+    <span class="hint">{{ 'Administrateur' if u.role == 'admin' else 'Utilisateur' }} ·
+      {{ counts.get(u.id, 0) }} mouvement(s)</span>
+    <form method="post" class="inline-form push-right">
+      <input type="hidden" name="user_id" value="{{ u.id }}">
+      <input type="hidden" name="nom" value="{{ u.nom }}">
+      <input type="hidden" name="role" value="{{ u.role }}">
+      <input type="hidden" name="actif" value="{{ '0' if u.actif else '1' }}">
+      <button type="submit" class="link-btn">{{ 'Désactiver' if u.actif else 'Réactiver' }}</button>
+    </form>
+  </div>
+
+  <table class="badges">
+    {% for type, label in [('mycard', 'myCard'), ('salto', 'Salto')] %}
+    {% set enregistre = u.mycard_hash if type == 'mycard' else u.salto_hash %}
+    <tr>
+      <td class="badge-name">{{ '●' if enregistre else '○' }} {{ label }}</td>
+      <td>
+        {% if enregistre %}
+        <span class="tag green">enregistré</span>
+        {% else %}
+        <span class="hint">non enregistré</span>
+        {% endif %}
+      </td>
+      <td>
+        <form method="post" action="/admin/utilisateurs/{{ u.id }}/badge" class="inline-form">
+          <input type="hidden" name="type" value="{{ type }}">
+          <input type="password" name="uid" autocomplete="off"
+                 placeholder="présentez le badge sur le lecteur…" class="badge-input">
+          <button type="submit">{{ 'Remplacer' if enregistre else 'Enregistrer' }}</button>
+        </form>
+      </td>
+      <td>
+        {% if enregistre %}
+        <form method="post" action="/admin/utilisateurs/{{ u.id }}/badge/supprimer">
+          <input type="hidden" name="type" value="{{ type }}">
+          <button type="submit" class="link-btn">Supprimer</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
   </table>
-</div>
-{% else %}
+</section>
+{% endfor %}
+
+{% if not users %}
 <p class="hint">Aucun utilisateur. Ajoutez au moins une personne pour pouvoir utiliser le kiosque.</p>
 {% endif %}
 

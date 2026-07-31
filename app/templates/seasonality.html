@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% set nav = 'saison' %}
+{% block content %}
+
+<h1>Saisonnalité</h1>
+
+{% if not annees %}
+<section class="panel todo">
+  <h2>Données insuffisantes</h2>
+  <p>
+    Aucune sortie enregistrée pour l'instant. Cette analyse a besoin d'au moins
+    une année scolaire complète pour être exploitable — elle se remplit
+    d'elle-même au fil des retraits au kiosque.
+  </p>
+  <p class="hint">
+    Chaque mouvement porte déjà son mois et son année scolaire : aucune donnée
+    n'est perdue en attendant.
+  </p>
+</section>
+{% else %}
+
+<p class="hint">
+  Année scolaire = {{ mois_labels[0] }} → {{ mois_labels[11] }}.
+  {% if nb_annees < 2 %}
+  <strong>n = {{ nb_annees }}</strong> — première année : les chiffres sont
+  réels mais ne constituent pas encore une tendance.
+  {% else %}
+  <strong>n = {{ nb_annees }}</strong> années disponibles.
+  {% endif %}
+</p>
+
+<form class="filters" method="get">
+  <select name="annee">
+    {% for a in annees %}
+    <option value="{{ a }}" {{ 'selected' if a == courante }}>{{ a }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit">Afficher</button>
+  <a class="btn" href="/admin/mouvements.csv">Exporter les mouvements (CSV)</a>
+</form>
+
+<section class="panel">
+  <h2>Consommation par mois — {{ courante }}</h2>
+  {% if lignes %}
+  <div class="table-wrap">
+    <table class="heat">
+      <thead>
+        <tr>
+          <th>Réf.</th>
+          {% for label in mois_labels %}<th class="r">{{ label }}</th>{% endfor %}
+          <th class="r">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for l in lignes %}
+        <tr>
+          <td class="mono">
+            {% if l.consumable.couleur %}<span class="dot dot-{{ l.consumable.couleur }}"></span>{% endif %}
+            {{ l.consumable.sku }}
+          </td>
+          {% for v in l.valeurs %}
+          <td class="r heat-{{ l.niveaux[loop.index0] }}">{{ v or '' }}</td>
+          {% endfor %}
+          <td class="r"><strong>{{ l.total }}</strong></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="hint">
+    Intensité normalisée par ligne : chaque consommable a son propre ordre de
+    grandeur, une échelle commune rendrait les tambours invisibles.
+  </p>
+  {% else %}
+  <p class="hint">Aucune sortie sur cette année scolaire.</p>
+  {% endif %}
+</section>
+
+{% if lignes %}
+<section class="panel">
+  <h2>Mois de pointe</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Réf.</th><th>Désignation</th><th>Pics observés</th></tr></thead>
+      <tbody>
+        {% for l in lignes %}
+        <tr>
+          <td class="mono">{{ l.consumable.sku }}</td>
+          <td>{{ l.consumable.designation }}</td>
+          <td>{{ l.pics|join(' · ') if l.pics else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
+{% if nb_annees > 1 %}
+<section class="panel">
+  <h2>Comparaison des années</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Année</th>{% for label in mois_labels %}<th class="r">{{ label }}</th>{% endfor %}<th class="r">Total</th></tr>
+      </thead>
+      <tbody>
+        {% for a, valeurs in totaux_annuels.items() %}
+        <tr>
+          <td><strong>{{ a }}</strong></td>
+          {% for v in valeurs %}<td class="r">{{ v or '' }}</td>{% endfor %}
+          <td class="r"><strong>{{ valeurs|sum }}</strong></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
+{% endif %}
+
+{% endblock %}

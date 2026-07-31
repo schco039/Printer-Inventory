@@ -168,6 +168,19 @@ body.kiosk {
 }
 .k-confirm:active { background: #1a8355; }
 
+.k-badge {
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  background: var(--k-panel); border: 2px dashed var(--k-line);
+  border-radius: 14px; padding: 28px 20px;
+}
+.k-badge-icon { font-size: 40px; letter-spacing: 4px; color: var(--k-accent); }
+.k-badge-text { font-size: 20px; margin: 0; }
+.k-badge-input {
+  width: 220px; height: 54px; text-align: center; font-size: 22px;
+  background: var(--k-bg); color: var(--k-ink);
+  border: 1px solid var(--k-line); border-radius: 10px;
+}
+
 .k-hint { color: var(--k-muted); font-size: 15px; margin-top: 12px; }
 .k-error {
   background: #3a1d1d; border: 1px solid var(--k-err); color: #ffc9c9;

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% set nav = 'reception' %}
+{% block content %}
+
+<p><a href="/admin/reception">‹ Réceptions</a></p>
+<h1>Livraison n° {{ delivery.id }}</h1>
+
+{% if annulee %}
+<p class="banner warn">Cette livraison a été annulée par contre-passation.</p>
+{% endif %}
+
+<section class="panel">
+  <p>
+    <strong>{{ delivery.fournisseur or 'Fournisseur non précisé' }}</strong><br>
+    Bon de livraison : <span class="mono">{{ delivery.bon_livraison or '—' }}</span><br>
+    Date : {{ delivery.date_livr.strftime('%d.%m.%Y') }} ·
+    saisie le {{ delivery.created_at.strftime('%d.%m.%Y %H:%M') }}
+    {% if delivery.note %}<br>Note : {{ delivery.note }}{% endif %}
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Réf.</th><th>Désignation</th><th class="r">Quantité</th></tr></thead>
+      <tbody>
+        {% for l in lignes %}
+        {% set c = consumables.get(l.consumable_id) %}
+        <tr>
+          <td class="mono">{{ c.sku if c else '?' }}</td>
+          <td>{{ c.designation if c else '—' }}</td>
+          <td class="r">+{{ l.quantite }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{% if not annulee %}
+<form method="post" action="/admin/reception/{{ delivery.id }}/annuler" class="panel">
+  <h2>Annuler cette livraison</h2>
+  <p class="hint">
+    Les écritures ne sont pas supprimées : des écritures inverses sont créées,
+    ce qui reste visible dans l'historique.
+  </p>
+  <button type="submit">Annuler la livraison</button>
+</form>
+{% endif %}
+
+{% endblock %}

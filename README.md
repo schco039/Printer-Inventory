@@ -88,7 +88,9 @@ beim Start automatisch.
    Der Assistent legt einen kompletten Satz (BK/C/M/Y + Trommel) in einem
    Schritt an; du tippst nur die Bestellnummern. Teilen sich zwei Modelle
    dieselben Kartuschen: *Copier depuis un autre modèle*
-3. **Personen** — `/admin/utilisateurs`, wer Material entnehmen darf
+3. **Personen und Badges** — `/admin/utilisateurs`. Person anlegen, dann je
+   Badge ins Feld klicken und die Karte an den Leser halten. myCard und Salto
+   sind getrennte Felder, beide funktionieren am Kiosk
 4. **Inventur** — `/admin/inventaire`, Lager zählen und als Anfangsbestand buchen
 5. **Kiosk** — `/kiosk` auf dem Touchscreen, ab jetzt wird gebucht
 
@@ -116,13 +118,28 @@ werden als `absent` markiert.
 - Markenebene erscheint automatisch ab der zweiten Marke
 - Modelle ohne Material ausgegraut, Bestand 0 gesperrt, Auto-Reset nach 45 s
 
-**Noch nicht:** RFID-Badges (M4), Wareneingang (M5), Bestellvorschlag (M6),
-Saisonauswertung (M7). Bis dahin ersetzt die manuelle Korrekturbuchung unter
-`/admin/mouvements` den Wareneingang.
+**M4 — Badges**
+- myCard und Salto je Person, beide gleichwertig am Kiosk
+- Gespeichert wird nur HMAC-SHA256 der UID, nie die Kartennummer
+- Ein Badge kann nicht zwei Personen gehören
+- Solange kein Badge angelernt ist, bleibt die Namensliste stehen —
+  danach schaltet der Kiosk automatisch in den Badge-Modus
 
-> Die Personenauswahl am Kiosk ist die Übergangslösung bis M4. Die Buchung
-> selbst ist bereits die endgültige — der Badge ersetzt später nur das
-> Antippen des Namens.
+**M5 — Wareneingang**
+- Lieferung mit Lieferant, Lieferschein-Nr., Datum und Zeilen
+- Bucht mit dem Lieferdatum, nicht dem Erfassungstag
+- Storno per Gegenbuchung, nie durch Löschen
+
+**M6 — Bestellung und Betrieb**
+- Bestellvorschlag je Lieferant: Ziel = max(Mindestbestand, 1 Satz je N Geräte),
+  saisonal angepasst
+- CSV-Export für Vorschläge und Bewegungen (Excel-tauglich, mit BOM)
+- Tägliche SQLite-Sicherung nach `data/backups`, 14 Tage
+
+**M7 — Saisonanalyse**
+- Heatmap Monat × Material je Schuljahr (Sept–Aug), Intensität je Zeile normiert
+- Spitzenmonate im Klartext, Jahresvergleich ab dem zweiten Schuljahr
+- Ohne Historie wird ausdrücklich *keine* Prognose gezeigt, sondern `n/d`
 
 ---
 
@@ -133,10 +150,13 @@ app/
   main.py         App-Zusammenbau
   models.py       Datenmodell (SPEC 4)
   importer.py     Excel-Import (SPEC 5)
-  services.py     Bestand, Buchungen, Schuljahr, Vorschläge
+  services.py     Bestand, Buchungen, Schuljahr, Saison, Vorschläge
+  security.py     Badge-Hashing (HMAC)
+  backup.py       tägliche SQLite-Sicherung
   db.py           Session + Einstellungen
-  auth.py         Basic-Auth für /admin (bis M4)
-  routers/        printers · imports · consumables · stock · users · kiosk
+  auth.py         Basic-Auth für /admin
+  routers/        printers · imports · consumables · stock · deliveries ·
+                  reports · users · kiosk
   templates/      Jinja2, Oberfläche auf Französisch
   static/app.css  Admin-CSS
   static/kiosk.css Kiosk-CSS — Touch-Flächen ≥ 64 px, altes Chromium-tauglich

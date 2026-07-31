@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     default_locale: str = "fr"
     tz: str = "Europe/Luxembourg"
 
+    # Tägliches SQLite-Backup (in Tests abgeschaltet)
+    backup_enabled: bool = True
+
     @property
     def db_path(self) -> Path:
         return self.data_dir / "app.db"

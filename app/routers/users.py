@@ -1,26 +1,34 @@
-"""Benutzerverwaltung — Minimalfassung.
+"""Benutzer und Badges (M4).
 
-Namen und Rollen. Die Badge-Felder (myCard/Salto) sind im Datenmodell bereits
-vorhanden, werden aber erst in M4 befüllt.
+myCard und Salto sind zwei getrennte Felder je Person. Beide funktionieren am
+Kiosk gleichwertig; welcher Badge benutzt wurde, landet in
+`movement.badge_type`.
 """
 
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.auth import require_admin
 from app.db import get_session
 from app.deps import templates
 from app.models import AppUser, Movement
+from app.security import badge_hash
 
 router = APIRouter(dependencies=[Depends(require_admin)])
 
+BADGE_FIELDS = {"mycard": "mycard_hash", "salto": "salto_hash"}
+
 
 @router.get("/admin/utilisateurs", response_class=HTMLResponse)
-def users_list(request: Request, session: Session = Depends(get_session)) -> HTMLResponse:
+def users_list(
+    request: Request,
+    erreur: str = "",
+    session: Session = Depends(get_session),
+) -> HTMLResponse:
     users = list(session.scalars(select(AppUser).order_by(AppUser.nom)).all())
     counts = dict(
         session.execute(
@@ -29,8 +37,16 @@ def users_list(request: Request, session: Session = Depends(get_session)) -> HTM
             .group_by(Movement.user_id)
         ).all()
     )
+    nb_badges = session.scalar(
+        select(func.count())
+        .select_from(AppUser)
+        .where(or_(AppUser.mycard_hash.is_not(None), AppUser.salto_hash.is_not(None)))
+    ) or 0
+
     return templates.TemplateResponse(
-        request, "users.html", {"users": users, "counts": counts}
+        request,
+        "users.html",
+        {"users": users, "counts": counts, "nb_badges": nb_badges, "erreur": erreur},
     )
 
 
@@ -57,5 +73,58 @@ def save_user(
     user.nom = nom
     user.role = role if role in ("user", "admin") else "user"
     user.actif = 1 if actif == "1" else 0
+    session.commit()
+    return RedirectResponse("/admin/utilisateurs", status_code=303)
+
+
+@router.post("/admin/utilisateurs/{user_id}/badge")
+def enroll_badge(
+    user_id: int,
+    session: Session = Depends(get_session),
+    type: str = Form(...),
+    uid: str = Form(""),
+) -> RedirectResponse:
+    """Badge anlernen. Die UID verlässt diese Funktion nie im Klartext."""
+    user = session.get(AppUser, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+    field = BADGE_FIELDS.get(type)
+    if field is None:
+        raise HTTPException(status_code=400, detail="Type de badge inconnu")
+
+    digest = badge_hash(uid)
+    if not digest:
+        return RedirectResponse(
+            "/admin/utilisateurs?erreur=Aucun+badge+lu+—+réessayez", status_code=303
+        )
+
+    # Schon jemand anderem zugeordnet?
+    owner = session.scalar(
+        select(AppUser).where(
+            or_(AppUser.mycard_hash == digest, AppUser.salto_hash == digest)
+        )
+    )
+    if owner is not None and owner.id != user_id:
+        return RedirectResponse(
+            f"/admin/utilisateurs?erreur=Ce+badge+est+déjà+attribué+à+{owner.nom}",
+            status_code=303,
+        )
+
+    setattr(user, field, digest)
+    session.commit()
+    return RedirectResponse("/admin/utilisateurs", status_code=303)
+
+
+@router.post("/admin/utilisateurs/{user_id}/badge/supprimer")
+def remove_badge(
+    user_id: int,
+    session: Session = Depends(get_session),
+    type: str = Form(...),
+) -> RedirectResponse:
+    user = session.get(AppUser, user_id)
+    field = BADGE_FIELDS.get(type)
+    if user is None or field is None:
+        raise HTTPException(status_code=404, detail="Introuvable")
+    setattr(user, field, None)
     session.commit()
     return RedirectResponse("/admin/utilisateurs", status_code=303)

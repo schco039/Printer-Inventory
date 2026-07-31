@@ -11,6 +11,8 @@ import tempfile
 
 os.environ.setdefault("DATA_DIR", tempfile.mkdtemp(prefix="lgk-test-"))
 os.environ.setdefault("ADMIN_PASSWORD", "")
+os.environ.setdefault("APP_SECRET", "test-secret-nur-fuer-tests")
+os.environ.setdefault("BACKUP_ENABLED", "false")
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

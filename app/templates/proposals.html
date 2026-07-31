@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% set nav = 'propositions' %}
+{% block content %}
+
+<h1>Proposition de commande</h1>
+
+{% if groupes %}
+<p class="hint">
+  Cible = maximum entre le seuil d'alerte et 1 jeu pour {{ reserve }} appareils,
+  ajusté par la saison quand l'historique le permet.
+  <a class="btn" href="/admin/propositions.csv">Exporter en CSV</a>
+</p>
+
+{% for fournisseur, items in groupes.items() %}
+<section class="panel">
+  <h2>{{ fournisseur }}</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Réf.</th><th>Désignation</th><th class="r">App.</th>
+          <th class="r">Stock</th><th class="r">Cible</th>
+          <th class="r">À commander</th><th>Saison</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for i in items %}
+        <tr>
+          <td class="mono">{{ i.consumable.sku }}</td>
+          <td>
+            {% if i.consumable.couleur %}<span class="dot dot-{{ i.consumable.couleur }}"></span>{% endif %}
+            {{ i.consumable.designation }}
+          </td>
+          <td class="r">{{ i.appareils }}</td>
+          <td class="r {{ 'neg' if i.stock <= 0 }}">{{ i.stock }}</td>
+          <td class="r">{{ i.cible }}</td>
+          <td class="r"><strong>{{ i.manque }}</strong></td>
+          <td class="hint">
+            {% if i.saison and i.facteur and i.facteur >= 1.15 %}
+              ↑ mois chargé (×{{ '%.1f'|format(i.facteur) }})
+            {% elif i.saison and i.facteur and i.facteur <= 0.85 %}
+              ↓ mois calme (×{{ '%.1f'|format(i.facteur) }})
+            {% elif i.saison %}—
+            {% else %}<span title="pas encore d'historique">n/d</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endfor %}
+
+<p class="hint">Total : {{ total }} article(s) à commander.</p>
+
+{% else %}
+<section class="panel">
+  <h2>Rien à commander</h2>
+  <p class="hint">
+    Tous les consommables sont au-dessus de leur cible — ou le catalogue et
+    l'inventaire ne sont pas encore renseignés.
+  </p>
+</section>
+{% endif %}
+
+{% endblock %}

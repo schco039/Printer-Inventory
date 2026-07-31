@@ -823,19 +823,19 @@ Wichtiger als der Termin ist, dass ab dem ersten Buchungstag lückenlos gebucht 
 | **M2** | Consommables-CRUD + Kompatibilitätsmatrix + Inventurmaske | Toner-Zuordnung gepflegt | ✅ fertig |
 | **M3** | Kiosk-UI + Bewegungen, noch ohne Badge (Person aus Liste) | Am Touchscreen bedienbar | ✅ fertig |
 | — | **Eröffnungsinventur, Produktivstart** | Buchungen laufen | **01.09.2026** |
-| **M4** | Badges, HMAC, Anlernen, Kiosk-Buchung per Badge | Restaurant-Logik läuft | Sept |
-| **M5** | Wareneingang + Lieferungen | Bestellungen einpflegbar | Sept/Okt |
-| **M6** | Bestellvorschlag, Backup-Job, CSV-Export | Voller Funktionsumfang | Herbst |
-| **M7** | Saisonanalyse: Heatmap, Jahresvergleich, Spitzenmonate, saisonaler Bestellvorschlag | ab 2. Schuljahr aussagekräftig | 2027 |
+| **M4** | Badges, HMAC, Anlernen, Kiosk-Buchung per Badge | Restaurant-Logik läuft | ✅ fertig |
+| **M5** | Wareneingang + Lieferungen | Bestellungen einpflegbar | ✅ fertig |
+| **M6** | Bestellvorschlag, Backup-Job, CSV-Export | Voller Funktionsumfang | ✅ fertig |
+| **M7** | Saisonanalyse: Heatmap, Jahresvergleich, Spitzenmonate, saisonaler Bestellvorschlag | ab 2. Schuljahr aussagekräftig | ✅ fertig |
 
-M0–M3 stehen. **Der kritische Pfad ist damit nicht mehr der Code, sondern die
-Materialstammdaten** — die rund 24 Datensätze mit den richtigen Bestellnummern
-und die Kompatibilitätsmatrix. Das braucht dich, nicht mich, und ist die
-Voraussetzung für die Eröffnungsinventur.
+**Alle Meilensteine sind umgesetzt.** Der kritische Pfad ist damit nicht mehr
+der Code, sondern die **Materialstammdaten**: die rund 24 Datensätze mit den
+richtigen Bestellnummern und die Kompatibilitätsmatrix. Das braucht dich,
+nicht mich, und ist die Voraussetzung für die Eröffnungsinventur.
 
-Bis M5 fertig ist, wird der Wareneingang über die manuelle Korrekturbuchung
-unter `/admin/mouvements` erfasst — funktional gleichwertig, nur ohne
-Lieferschein-Zuordnung.
+M7 ist funktionsfähig, aber naturgemäß erst ab dem zweiten Schuljahr
+aussagekräftig — bis dahin zeigt die Oberfläche die reinen Zahlen und
+ausdrücklich keine Prognose.
 
 M7 steht bewusst am Ende: die Auswertung braucht Daten, die erst der Betrieb
 erzeugt. Die **Datenerfassung dafür ist aber schon ab M3 vollständig**
@@ -849,6 +849,8 @@ schon parallel zu M0.
 ---
 
 ## 12. Offene Punkte
+
+Alles Folgende braucht **dich**, nicht weiteren Code.
 
 1. **Salto-Badge: Random UID?** → Test mit Reader, blockierend für M4.
    Bei DESFire im Privacy-Mode ändert sich die UID bei jeder Lesung; dann
@@ -882,4 +884,23 @@ schon parallel zu M0.
 
 *Erledigt: Start bei null zum Schuljahr 2026/27, kein Altdatenimport ·
 Ausschluss 3D-Drucker und Evolis · Badge-Modell mit zwei Feldern je Benutzer ·
-Plotter bleibt im Umfang.*
+Plotter bleibt im Umfang · Negativbestand wird blockiert (Punkt 6) ·
+Ergiebigkeitsvarianten als getrennte Datensätze, im Kiosk unter der Farbe
+gruppiert.*
+
+---
+
+## 13. Datenschutz
+
+- **Badge-UIDs** werden nur als HMAC-SHA256 gespeichert, nie im Klartext, und
+  nicht protokolliert. Die Datenbank taugt damit nicht zum Klonen von Karten.
+- **`APP_SECRET` nicht mehr ändern**, sobald Badges angelernt sind — sonst
+  passen alle Hashes nicht mehr und jede Karte muss neu angelernt werden.
+- **Bewegungshistorie**: Es bleibt bei der Empfehlung aus Abschnitt 12,
+  Punkt 8 — `movement.user_id` nach 24 Monaten auf NULL setzen, die Bewegung
+  selbst behalten. Die Saisonauswertung braucht die Person nicht, nur
+  Material, Menge und Datum. Ein automatischer Lauf dafür ist bewusst **nicht**
+  eingebaut: die Frist ist eine Entscheidung der Schule, kein technischer
+  Standardwert.
+- Die Anwendung gehört ins interne Netz. Sie ist nicht für das offene Internet
+  gehärtet.
