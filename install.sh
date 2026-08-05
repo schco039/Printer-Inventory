@@ -94,8 +94,23 @@ $COMPOSE up -d --build
 
 info "Warte auf die Anwendung…"
 URL="http://127.0.0.1:${APP_PORT}/healthz"
+
+# Auf einem nackten Server ist weder curl noch wget garantiert vorhanden.
+# Letzter Ausweg ist das Python im Container selbst.
+health_check() {
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsS "$URL" >/dev/null 2>&1
+  elif command -v wget >/dev/null 2>&1; then
+    wget -q -O /dev/null "$URL"
+  else
+    $COMPOSE exec -T app python -c \
+      "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz')" \
+      >/dev/null 2>&1
+  fi
+}
+
 for i in $(seq 1 60); do
-  if curl -fsS "$URL" >/dev/null 2>&1; then
+  if health_check; then
     ok "Anwendung antwortet"
     break
   fi

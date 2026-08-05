@@ -7,6 +7,13 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /srv
 
+# tzdata fehlt im slim-Image. Ohne sie ignoriert die C-Bibliothek TZ und
+# alles läuft auf UTC — Buchungszeiten wären im Sommer zwei Stunden zu früh
+# und eine Entnahme kurz nach Mitternacht landete im falschen Monat.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends tzdata \
+ && rm -rf /var/lib/apt/lists/*
+
 # Nicht als root laufen lassen
 RUN adduser --system --group --home /srv app
 
