@@ -53,7 +53,16 @@ random_hex() {
 
 random_password() {
   # Ohne mehrdeutige Zeichen (0/O, 1/l/I) — wird auf Zettel geschrieben.
-  LC_ALL=C tr -dc 'A-HJ-NP-Za-km-z2-9' < /dev/urandom | head -c 16
+  #
+  # Achtung: 'tr < /dev/urandom | head -c 16' sieht naheliegend aus, bricht
+  # aber unter 'set -o pipefail' ab — head beendet sich zuerst, tr bekommt
+  # SIGPIPE und die Pipeline meldet 141. Deshalb erst eine feste Menge lesen
+  # und danach in der Shell kürzen.
+  local raw=""
+  while [ ${#raw} -lt 16 ]; do
+    raw="${raw}$(head -c 256 /dev/urandom | LC_ALL=C tr -dc 'A-HJ-NP-Za-km-z2-9' || true)"
+  done
+  printf '%s' "${raw:0:16}"
 }
 
 # ── 3. .env anlegen ──────────────────────────────────────────────────
@@ -72,8 +81,8 @@ if [ ! -f .env ]; then
   ok ".env erstellt"
 else
   ok ".env vorhanden — wird nicht überschrieben"
-  # shellcheck disable=SC1091
-  ADMIN_PASSWORD="$(grep -E '^ADMIN_PASSWORD=' .env | cut -d= -f2-)"
+  # '|| true': fehlt die Zeile, liefert grep 1 und pipefail würde abbrechen
+  ADMIN_PASSWORD="$(grep -E '^ADMIN_PASSWORD=' .env | cut -d= -f2- || true)"
   [ -n "${ADMIN_PASSWORD}" ] || warn "ADMIN_PASSWORD ist leer — die Admin-Oberfläche ist ungeschützt!"
 fi
 
