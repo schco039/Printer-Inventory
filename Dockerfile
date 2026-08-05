@@ -7,11 +7,13 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /srv
 
-# tzdata fehlt im slim-Image. Ohne sie ignoriert die C-Bibliothek TZ und
-# alles läuft auf UTC — Buchungszeiten wären im Sommer zwei Stunden zu früh
-# und eine Entnahme kurz nach Mitternacht landete im falschen Monat.
+# tzdata: ohne sie ignoriert die C-Bibliothek TZ und alles läuft auf UTC —
+#   Buchungszeiten wären im Sommer zwei Stunden zu früh und eine Entnahme
+#   kurz nach Mitternacht landete im falschen Monat.
+# gosu: der Entrypoint richtet als root die Rechte auf dem gemounteten
+#   Datenverzeichnis und gibt die Privilegien danach wieder ab.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends tzdata \
+ && apt-get install -y --no-install-recommends tzdata gosu \
  && rm -rf /var/lib/apt/lists/*
 
 # Nicht als root laufen lassen
@@ -29,7 +31,10 @@ RUN chmod +x /entrypoint.sh \
  && mkdir -p /data \
  && chown -R app:app /data /srv
 
-USER app
+# Bewusst kein 'USER app': der Entrypoint startet kurz als root, korrigiert die
+# Rechte auf dem Bind-Mount und wechselt dann per gosu auf 'app'. Ohne diesen
+# Schritt kann der Container die SQLite-Datei im gemounteten ./data nicht
+# anlegen — das Verzeichnis gehört dem Host-Benutzer.
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
