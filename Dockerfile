@@ -16,8 +16,11 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends tzdata gosu \
  && rm -rf /var/lib/apt/lists/*
 
-# Nicht als root laufen lassen
-RUN adduser --system --group --home /srv app
+# Nicht als root laufen lassen. Feste UID/GID, damit die Dateien in ./data auf
+# dem Host nicht zufällig einem vorhandenen Systemkonto zugeordnet werden —
+# ohne das gehört die Datenbank auf Ubuntu z. B. dem Benutzer 'syslog'.
+RUN addgroup --system --gid 10001 app \
+ && adduser --system --uid 10001 --ingroup app --home /srv app
 
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
