@@ -2,7 +2,8 @@ services:
   app:
     build: .
     image: lgk-printer:latest
-    container_name: lgk-printer
+    # Name überschreibbar, falls auf dem Host schon ein Container so heißt
+    container_name: ${CONTAINER_NAME:-lgk-printer}
     restart: unless-stopped
     env_file: .env
     environment:
@@ -12,4 +13,21 @@ services:
       # Datenbank, Uploads und Backups liegen auf dem Host — Container ist wegwerfbar
       - ./data:/data
     ports:
+      # Auf einem Host mit weiteren Diensten notfalls APP_PORT in .env ändern.
+      # Läuft dort bereits ein Reverse Proxy, kann dieser Block entfallen —
+      # siehe README, Abschnitt "Betrieb neben anderen Diensten".
       - "${APP_PORT:-8080}:8000"
+
+# Betrieb hinter einem vorhandenen Reverse Proxy (Traefik, Nginx Proxy Manager,
+# Caddy): den ports-Block oben auskommentieren, damit nichts nach außen
+# veröffentlicht wird, und den Container ins Netz des Proxys hängen:
+#
+#     networks:
+#       - proxy
+#
+# networks:
+#   proxy:
+#     external: true
+#
+# Der Proxy spricht den Dienst dann intern unter http://lgk-printer:8000 an.
+# Die Anwendung wertet X-Forwarded-* aus (uvicorn --proxy-headers).

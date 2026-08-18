@@ -89,17 +89,43 @@ fi
 APP_PORT="$(grep -E '^APP_PORT=' .env | cut -d= -f2- || true)"
 APP_PORT="${APP_PORT:-8080}"
 
-# ── 4. Datenverzeichnis ──────────────────────────────────────────────
+# ── 4. Port frei? ────────────────────────────────────────────────────
+# Auf einem Host mit weiteren Diensten ist das der einzige echte
+# Kollisionspunkt. Lieber hier klar melden als später einen rohen Docker-Fehler.
+
+port_belegt() {
+  if command -v ss >/dev/null 2>&1; then
+    ss -ltnH 2>/dev/null | awk '{print $4}' | grep -qE "[:.]${APP_PORT}$"
+  elif command -v netstat >/dev/null 2>&1; then
+    netstat -ltn 2>/dev/null | awk '{print $4}' | grep -qE "[:.]${APP_PORT}$"
+  else
+    return 1   # nicht prüfbar — Docker meldet es notfalls selbst
+  fi
+}
+
+# 'ps -q' statt 'ps': letzteres druckt auch bei leerem Projekt eine Kopfzeile
+# und hätte die Prüfung damit immer übersprungen.
+if port_belegt && [ -z "$($COMPOSE ps -q 2>/dev/null)" ]; then
+  fail "Port ${APP_PORT} ist auf diesem Host bereits belegt.
+  Trage in der Datei .env einen freien Port ein, zum Beispiel:
+      APP_PORT=8090
+  und starte dieses Skript erneut.
+  Läuft auf dem Host bereits ein Reverse Proxy, siehe README,
+  Abschnitt \"Betrieb neben anderen Diensten\"."
+fi
+ok "Port ${APP_PORT} verfügbar"
+
+# ── 5. Datenverzeichnis ──────────────────────────────────────────────
 
 mkdir -p data/uploads data/backups
 ok "Datenverzeichnis bereit (./data)"
 
-# ── 5. Bauen und starten ─────────────────────────────────────────────
+# ── 6. Bauen und starten ─────────────────────────────────────────────
 
 info "Baue Image und starte Container (beim ersten Mal dauert das ein paar Minuten)…"
 $COMPOSE up -d --build
 
-# ── 6. Auf Gesundheit warten ─────────────────────────────────────────
+# ── 7. Auf Gesundheit warten ─────────────────────────────────────────
 
 info "Warte auf die Anwendung…"
 URL="http://127.0.0.1:${APP_PORT}/healthz"
@@ -132,7 +158,7 @@ for i in $(seq 1 60); do
   sleep 1
 done
 
-# ── 7. Zusammenfassung ───────────────────────────────────────────────
+# ── 8. Zusammenfassung ───────────────────────────────────────────────
 
 HOST_IP="$(hostname -I 2>/dev/null | awk '{print $1}' || echo 'localhost')"
 

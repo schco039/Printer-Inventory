@@ -189,6 +189,54 @@ Nach Änderungen am Datenmodell:
 
 ---
 
+## Betrieb neben anderen Diensten
+
+Die Anwendung ist als Mitbewohner auf einem Docker-Host gedacht, auf dem schon
+anderes läuft. Sie braucht keinen Datenbankserver, keinen Cache und keinen
+Message Broker — ein Python-Prozess und eine SQLite-Datei.
+
+| | |
+|---|---|
+| Arbeitsspeicher | rund 100 MB im Betrieb |
+| Ablage | `./data` im Projektverzeichnis, sonst nichts |
+| Netzwerk | eigenes Compose-Netz, keine Verbindung zu anderen Containern |
+| Datenbank | SQLite in der Ablage — kein zusätzlicher Dienst |
+
+### Der einzige echte Kollisionspunkt: der Port
+
+Standard ist **8080**. Ist der auf dem Host belegt, bricht `install.sh` mit
+einer klaren Meldung ab, statt einen rohen Docker-Fehler zu zeigen. Dann in
+`.env` einen freien Port eintragen und das Skript erneut starten:
+
+```bash
+APP_PORT=8090
+```
+
+Heißt auf dem Host bereits ein Container `lgk-printer`, lässt sich der Name in
+`.env` über `CONTAINER_NAME` ändern.
+
+### Hinter einem vorhandenen Reverse Proxy
+
+Läuft auf dem Host schon Traefik, Nginx Proxy Manager oder Caddy, ist es
+sauberer, gar keinen Port zu veröffentlichen:
+
+1. In `docker-compose.yml` den `ports:`-Block auskommentieren
+2. Den Container ins Netz des Proxys hängen (Beispiel steht als Kommentar
+   unten in derselben Datei)
+3. Im Proxy auf `http://lgk-printer:8000` weiterleiten
+
+Die Anwendung wertet `X-Forwarded-*` aus (`uvicorn --proxy-headers`), Links und
+Weiterleitungen bleiben also korrekt. Für den Kiosk auf dem Raspberry Pi dann
+die Adresse des Proxys eintragen statt `host:8080`.
+
+### Was die Anwendung *nicht* tut
+
+- Sie ändert nichts an anderen Containern, Netzen oder Volumes
+- Sie braucht keine Docker-Socket-Einbindung
+- Sie schreibt ausschließlich in `./data`
+
+---
+
 ## Kiosk auf dem Raspberry Pi
 
 Der Pi ist reiner Client — keine Daten, keine Anwendung. Chromium im
