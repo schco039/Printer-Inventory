@@ -50,6 +50,18 @@ def users_list(
     )
 
 
+@router.get("/admin/badge-test", response_class=HTMLResponse)
+def badge_test(request: Request) -> HTMLResponse:
+    """Diagnoseseite für den RFID-Leser.
+
+    Zeigt roh an, was das Gerät sendet — ohne etwas zu speichern. Damit lässt
+    sich vor Ort klären, ob der Leser überhaupt als Tastatur schreibt, ob eine
+    Eingabetaste folgt und ob die UID bei jeder Lesung gleich bleibt
+    (Salto-Karten können eine zufällige UID liefern).
+    """
+    return templates.TemplateResponse(request, "badge_test.html", {})
+
+
 @router.post("/admin/utilisateurs")
 def save_user(
     session: Session = Depends(get_session),

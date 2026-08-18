@@ -12,16 +12,36 @@
     <a class="brand" href="/admin">Consommables <span>LGK</span></a>
     <nav>
       <a href="/admin" class="{{ 'on' if nav == 'dashboard' }}">Tableau de bord</a>
-      <a href="/admin/consommables" class="{{ 'on' if nav == 'consommables' }}">Consommables</a>
-      <a href="/admin/compatibilites" class="{{ 'on' if nav == 'compat' }}">Compatibilités</a>
-      <a href="/admin/reception" class="{{ 'on' if nav == 'reception' }}">Réception</a>
-      <a href="/admin/inventaire" class="{{ 'on' if nav == 'inventaire' }}">Inventaire</a>
-      <a href="/admin/mouvements" class="{{ 'on' if nav == 'mouvements' }}">Mouvements</a>
-      <a href="/admin/propositions" class="{{ 'on' if nav == 'propositions' }}">Commandes</a>
-      <a href="/admin/saisonnalite" class="{{ 'on' if nav == 'saison' }}">Saisonnalité</a>
-      <a href="/admin/imprimantes" class="{{ 'on' if nav == 'printers' }}">Imprimantes</a>
+
+      <div class="menu {{ 'on' if nav in ['consommables', 'compat', 'inventaire', 'mouvements', 'reception'] }}">
+        <span class="menu-title">Stock ▾</span>
+        <div class="menu-items">
+          <a href="/admin/consommables">Consommables</a>
+          <a href="/admin/compatibilites">Compatibilités</a>
+          <a href="/admin/reception">Réception</a>
+          <a href="/admin/inventaire">Inventaire</a>
+          <a href="/admin/mouvements">Mouvements</a>
+        </div>
+      </div>
+
+      <div class="menu {{ 'on' if nav in ['propositions', 'saison'] }}">
+        <span class="menu-title">Commandes ▾</span>
+        <div class="menu-items">
+          <a href="/admin/propositions">Proposition de commande</a>
+          <a href="/admin/saisonnalite">Saisonnalité</a>
+        </div>
+      </div>
+
+      <div class="menu {{ 'on' if nav in ['printers', 'modeles', 'import'] }}">
+        <span class="menu-title">Parc ▾</span>
+        <div class="menu-items">
+          <a href="/admin/imprimantes">Imprimantes</a>
+          <a href="/admin/modeles">Modèles</a>
+          <a href="/admin/import">Import de l'inventaire</a>
+        </div>
+      </div>
+
       <a href="/admin/utilisateurs" class="{{ 'on' if nav == 'users' }}">Utilisateurs</a>
-      <a href="/admin/import" class="{{ 'on' if nav == 'import' }}">Import</a>
     </nav>
     <a class="kiosk-link" href="/kiosk" target="_blank" rel="noopener">Kiosque ↗</a>
   </header>

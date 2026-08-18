@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% set nav = 'modeles' %}
+{% block content %}
+
+<h1>Modèles <span class="count">{{ models|length }}</span></h1>
+
+<p class="hint">
+  Marque et modèle proviennent de l'export Excel. Si le programme d'inventaire
+  les a mal enregistrés, la correction se fait ici — l'affichage change partout,
+  mais l'identité pour le ré-import reste intacte.
+</p>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Affiché</th><th>Valeur de l'export</th><th>Catégorie</th><th class="r">App.</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for m in models %}
+      <tr>
+        <td>
+          <strong>{{ m.libelle }}</strong>
+          {% if m.corrige %}<span class="tag blue">corrigé</span>{% endif %}
+        </td>
+        <td class="hint mono">{{ m.libelle_source }}</td>
+        <td class="hint">{{ m.categorie or '—' }}</td>
+        <td class="r">{{ counts.get(m.id, 0) }}</td>
+        <td class="r"><a class="btn" href="/admin/modeles/{{ m.id }}">Corriger</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if not models %}
+<p class="hint">Aucun modèle. <a href="/admin/import">Importer l'inventaire</a>.</p>
+{% endif %}
+
+{% endblock %}

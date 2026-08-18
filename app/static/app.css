@@ -240,3 +240,41 @@ table.heat td { font-variant-numeric: tabular-nums; }
 .heat-2 { background: #c7dcf4; }
 .heat-3 { background: #9dc2ea; }
 .heat-4 { background: #6da6e0; font-weight: 700; }
+
+/* ── Navigation mit Gruppen ─────────────────────────────────────── */
+/* Reines CSS, kein JavaScript: öffnet bei :hover und bei :focus-within,
+   funktioniert also auch per Tastatur und auf altem Chromium. */
+
+.topbar nav { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.topbar nav > a, .menu-title {
+  display: inline-block; padding: 8px 12px; border-radius: 6px;
+  color: var(--muted); text-decoration: none; white-space: nowrap; cursor: default;
+}
+.topbar nav > a { cursor: pointer; }
+.topbar nav > a:hover, .menu:hover .menu-title { color: var(--ink); background: var(--bg); }
+.topbar nav > a.on, .menu.on > .menu-title { color: var(--accent); background: #eaf1fa; }
+
+.menu { position: relative; }
+.menu-items {
+  position: absolute; top: 100%; left: 0; z-index: 50;
+  display: none; min-width: 220px; padding: 6px;
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 8px; box-shadow: 0 6px 20px rgba(0, 0, 0, .12);
+}
+.menu:hover .menu-items, .menu:focus-within .menu-items { display: block; }
+.menu-items a {
+  display: block; padding: 9px 12px; border-radius: 6px;
+  color: var(--ink); text-decoration: none; font-size: 14px; white-space: nowrap;
+}
+.menu-items a:hover { background: var(--bg); color: var(--accent); }
+
+/* Badge-Anlernen und Diagnose */
+.badge-form { flex-wrap: nowrap; }
+.badge-input {
+  min-width: 300px; letter-spacing: .05em;
+  border: 2px dashed var(--line) !important;
+}
+.badge-input:focus {
+  border-style: solid !important; border-color: var(--accent) !important;
+  outline: none; background: #f7fbff;
+}

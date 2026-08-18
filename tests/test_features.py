@@ -325,3 +325,87 @@ def test_backup_erzeugt_lesbare_kopie(client, db, export):
     with sqlite3.connect(target) as conn:
         n = conn.execute("SELECT COUNT(*) FROM printer").fetchone()[0]
     assert n == 3
+
+
+# ─────────────────────────── Fehlerbehebungen ────────────────────────
+
+
+def test_modell_anzeige_laesst_sich_korrigieren(client, db, export):
+    """SC-T5100 ist im Export als Brother erfasst, ist aber eine Epson."""
+    do_import(client, export)
+    model = db.scalar(select(PrinterModel).where(PrinterModel.slug == "brother-hl-l8260cdw"))
+
+    client.post(f"/admin/modeles/{model.id}",
+                data={"marque_override": "Epson", "modele_override": "SureColor T5100",
+                      "categorie": ""},
+                follow_redirects=True)
+    db.expire_all()
+    model = db.get(PrinterModel, model.id)
+
+    assert model.libelle == "Epson SureColor T5100"
+    assert model.corrige is True
+    # Identität für den Re-Import bleibt unangetastet
+    assert model.marque == "Brother" and model.slug == "brother-hl-l8260cdw"
+    # Korrektur wirkt in der Oberfläche
+    assert "Epson SureColor T5100" in client.get("/admin/imprimantes").text
+
+
+def test_korrektur_ueberlebt_einen_erneuten_import(client, db, export):
+    do_import(client, export)
+    model = db.scalar(select(PrinterModel).where(PrinterModel.slug == "brother-hl-l8260cdw"))
+    client.post(f"/admin/modeles/{model.id}",
+                data={"marque_override": "Epson", "modele_override": "", "categorie": ""},
+                follow_redirects=True)
+
+    do_import(client, export)          # Jahresimport erneut
+    db.expire_all()
+    assert db.get(PrinterModel, model.id).marque_affichee == "Epson"
+
+
+def test_leere_korrektur_setzt_zurueck(client, db, export):
+    do_import(client, export)
+    model = db.scalar(select(PrinterModel).where(PrinterModel.slug == "brother-hl-l8260cdw"))
+    client.post(f"/admin/modeles/{model.id}",
+                data={"marque_override": "Epson", "modele_override": "", "categorie": ""},
+                follow_redirects=True)
+    client.post(f"/admin/modeles/{model.id}",
+                data={"marque_override": "", "modele_override": "", "categorie": ""},
+                follow_redirects=True)
+    db.expire_all()
+    model = db.get(PrinterModel, model.id)
+    assert model.marque_override is None
+    assert model.libelle == "Brother HL-L8260CDW"
+
+
+def test_benutzer_lassen_sich_bearbeiten(client, db):
+    client.post("/admin/utilisateurs", data={"user_id": 0, "nom": "Paul Muler"},
+                follow_redirects=True)
+    user = db.scalar(select(AppUser))
+
+    client.post("/admin/utilisateurs",
+                data={"user_id": user.id, "nom": "Paul Muller", "role": "admin", "actif": "1"},
+                follow_redirects=True)
+    db.expire_all()
+    user = db.get(AppUser, user.id)
+    assert user.nom == "Paul Muller"
+    assert user.role == "admin"
+    assert user.actif == 1
+
+    # Bearbeitungsfelder sind auf der Seite vorhanden
+    page = client.get("/admin/utilisateurs").text
+    assert 'value="Paul Muller"' in page
+
+
+def test_badge_feld_ist_sichtbar_kein_passwortfeld(client, db):
+    """type=password verbarg die Eingabe — man sah nicht, ob der Leser sendet."""
+    client.post("/admin/utilisateurs", data={"user_id": 0, "nom": "Anne"},
+                follow_redirects=True)
+    page = client.get("/admin/utilisateurs").text
+    assert 'name="uid"' in page
+    assert 'type="password" name="uid"' not in page
+
+
+def test_leser_diagnoseseite_erreichbar(client):
+    page = client.get("/admin/badge-test")
+    assert page.status_code == 200
+    assert "UID aléatoire" in page.text

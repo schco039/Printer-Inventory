@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% set nav = 'users' %}
+{% block content %}
+
+<p><a href="/admin/utilisateurs">‹ Utilisateurs</a></p>
+<h1>Tester le lecteur de badges</h1>
+
+<p class="hint">
+  Cette page n'enregistre rien. Elle montre exactement ce que le lecteur envoie,
+  pour répondre à trois questions : le lecteur écrit-il comme un clavier ?
+  Envoie-t-il une touche Entrée à la fin ? Et le numéro est-il le même à chaque
+  lecture de la même carte ?
+</p>
+
+<section class="panel">
+  <h2>1. Cliquez dans le champ, puis présentez une carte</h2>
+  <input type="text" id="zone" class="badge-input mono" style="width:100%;max-width:520px"
+         autocomplete="off" spellcheck="false" placeholder="en attente du lecteur…">
+  <p class="hint" id="etat">Aucune saisie pour l'instant.</p>
+</section>
+
+<section class="panel">
+  <h2>2. Lectures</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>Heure</th><th>Contenu reçu</th><th class="r">Signes</th><th>Entrée ?</th><th>Identique ?</th></tr></thead>
+      <tbody id="lignes">
+        <tr><td colspan="6" class="hint">Rien encore.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="hint" id="verdict"></p>
+</section>
+
+<section class="panel">
+  <h2>Comment lire le résultat</h2>
+  <ul class="steps">
+    <li><strong>Rien n'apparaît</strong> — le lecteur n'est pas en mode clavier (HID).
+      Beaucoup de modèles se configurent avec une carte de programmation fournie.</li>
+    <li><strong>Du texte apparaît, mais sans « Entrée »</strong> — cela fonctionne quand même,
+      il faut juste cliquer sur « Enregistrer » après la lecture.</li>
+    <li><strong>Le contenu change à chaque lecture de la même carte</strong> — UID aléatoire
+      (fréquent sur les badges Salto en mode privacy). Ce badge ne peut pas servir
+      d'identifiant ; utilisez la myCard pour cette personne.</li>
+    <li><strong>Des lettres inattendues apparaissent</strong> — la disposition clavier du
+      lecteur ne correspond pas à celle du poste (AZERTY / QWERTZ).</li>
+  </ul>
+</section>
+
+{% endblock %}
+
+{% block script %}
+<script>
+(function () {
+  var zone = document.getElementById('zone');
+  var lignes = document.getElementById('lignes');
+  var etat = document.getElementById('etat');
+  var verdict = document.getElementById('verdict');
+  var lectures = [];
+  var timer = null;
+
+  zone.focus();
+
+  function enregistrer(contenu, avecEntree) {
+    if (!contenu) { return; }
+    var identique = '—';
+    if (lectures.length > 0) {
+      identique = (lectures[lectures.length - 1].contenu === contenu) ? 'oui' : 'NON';
+    }
+    lectures.push({ contenu: contenu, entree: avecEntree, identique: identique });
+
+    if (lectures.length === 1) { lignes.innerHTML = ''; }
+    var d = new Date();
+    var tr = document.createElement('tr');
+    var cells = [
+      lectures.length,
+      ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2) + ':' + ('0' + d.getSeconds()).slice(-2),
+      contenu,
+      contenu.length,
+      avecEntree ? 'oui' : 'non',
+      identique
+    ];
+    for (var i = 0; i < cells.length; i++) {
+      var td = document.createElement('td');
+      td.textContent = cells[i];
+      if (i === 2) { td.className = 'mono'; }
+      if (i === 3) { td.className = 'r'; }
+      if (i === 5 && cells[i] === 'NON') { td.className = 'neg'; }
+      tr.appendChild(td);
+    }
+    lignes.appendChild(tr);
+
+    var differents = {};
+    for (var j = 0; j < lectures.length; j++) { differents[lectures[j].contenu] = 1; }
+    var nb = Object.keys(differents).length;
+    if (lectures.length >= 2) {
+      verdict.textContent = (nb === 1)
+        ? '✓ ' + lectures.length + ' lectures, toujours le même numéro — ce badge est utilisable.'
+        : '⚠ ' + lectures.length + ' lectures, ' + nb + ' numéros différents — UID aléatoire, ce badge ne peut pas identifier une personne.';
+    }
+    zone.value = '';
+    etat.textContent = 'Dernière lecture : ' + contenu.length + ' signes.';
+  }
+
+  zone.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (timer) { clearTimeout(timer); timer = null; }
+      enregistrer(zone.value.trim(), true);
+    }
+  });
+
+  // Ohne Enter: kurz nach der letzten Taste auswerten
+  zone.addEventListener('input', function () {
+    etat.textContent = 'Saisie en cours : ' + zone.value.length + ' signes…';
+    if (timer) { clearTimeout(timer); }
+    timer = setTimeout(function () {
+      enregistrer(zone.value.trim(), false);
+    }, 700);
+  });
+})();
+</script>
+{% endblock %}

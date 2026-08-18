@@ -7,9 +7,9 @@
 {% if erreur %}<p class="banner err">✕ {{ erreur }}</p>{% endif %}
 
 <p class="hint">
-  Les personnes qui retirent du matériel au kiosque. Chacune peut avoir deux
-  badges : myCard <strong>et</strong> Salto. Seule une empreinte
-  (HMAC-SHA256) est enregistrée — jamais le numéro de la carte.
+  Chaque personne peut avoir deux badges : myCard <strong>et</strong> Salto.
+  Seule une empreinte (HMAC-SHA256) est enregistrée — jamais le numéro de la carte.
+  Le lecteur ne réagit pas ? → <a href="/admin/badge-test">tester le lecteur</a>
 </p>
 
 {% if not nb_badges and users %}
@@ -40,19 +40,30 @@
 
 {% for u in users %}
 <section class="panel {{ 'is-inactive' if not u.actif }}">
-  <div class="user-head">
-    <h2>{{ u.nom }}</h2>
-    <span class="tag {{ 'green' if u.actif else 'grey' }}">{{ 'actif' if u.actif else 'inactif' }}</span>
-    <span class="hint">{{ 'Administrateur' if u.role == 'admin' else 'Utilisateur' }} ·
-      {{ counts.get(u.id, 0) }} mouvement(s)</span>
-    <form method="post" class="inline-form push-right">
-      <input type="hidden" name="user_id" value="{{ u.id }}">
-      <input type="hidden" name="nom" value="{{ u.nom }}">
-      <input type="hidden" name="role" value="{{ u.role }}">
-      <input type="hidden" name="actif" value="{{ '0' if u.actif else '1' }}">
-      <button type="submit" class="link-btn">{{ 'Désactiver' if u.actif else 'Réactiver' }}</button>
-    </form>
-  </div>
+
+  <form method="post" class="inline-form user-head">
+    <input type="hidden" name="user_id" value="{{ u.id }}">
+    <label class="grow">
+      <span>Nom</span>
+      <input type="text" name="nom" value="{{ u.nom }}" required>
+    </label>
+    <label>
+      <span>Rôle</span>
+      <select name="role">
+        <option value="user" {{ 'selected' if u.role != 'admin' }}>Utilisateur</option>
+        <option value="admin" {{ 'selected' if u.role == 'admin' }}>Administrateur</option>
+      </select>
+    </label>
+    <label>
+      <span>État</span>
+      <select name="actif">
+        <option value="1" {{ 'selected' if u.actif }}>Actif</option>
+        <option value="0" {{ 'selected' if not u.actif }}>Inactif</option>
+      </select>
+    </label>
+    <button type="submit">Enregistrer</button>
+    <span class="hint">{{ counts.get(u.id, 0) }} mouvement(s)</span>
+  </form>
 
   <table class="badges">
     {% for type, label in [('mycard', 'myCard'), ('salto', 'Salto')] %}
@@ -67,10 +78,11 @@
         {% endif %}
       </td>
       <td>
-        <form method="post" action="/admin/utilisateurs/{{ u.id }}/badge" class="inline-form">
+        <form method="post" action="/admin/utilisateurs/{{ u.id }}/badge" class="inline-form badge-form">
           <input type="hidden" name="type" value="{{ type }}">
-          <input type="password" name="uid" autocomplete="off"
-                 placeholder="présentez le badge sur le lecteur…" class="badge-input">
+          <input type="text" name="uid" autocomplete="off" spellcheck="false"
+                 placeholder="cliquez ici, puis présentez le badge…"
+                 class="badge-input mono">
           <button type="submit">{{ 'Remplacer' if enregistre else 'Enregistrer' }}</button>
         </form>
       </td>

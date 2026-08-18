@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% set nav = 'modeles' %}
+{% block content %}
+
+<p><a href="/admin/modeles">‹ Tous les modèles</a></p>
+<h1>{{ model.libelle }}</h1>
+
+{% if request.query_params.get('ok') %}
+<p class="banner ok">✓ Correction enregistrée.</p>
+{% endif %}
+
+<section class="panel">
+  <h2>Valeurs de l'export</h2>
+  <p class="hint">
+    Ces valeurs viennent du programme d'inventaire et ne sont pas modifiables
+    ici : elles identifient le modèle lors du prochain import.
+  </p>
+  <table class="summary">
+    <tr><td>Marque</td><td class="mono">{{ model.marque }}</td></tr>
+    <tr><td>Modèle</td><td class="mono">{{ model.modele }}</td></tr>
+    <tr><td>Identifiant</td><td class="mono">{{ model.slug }}</td></tr>
+  </table>
+</section>
+
+<form method="post" class="panel form">
+  <h2>Correction d'affichage</h2>
+  <div class="grid2">
+    <label>
+      <span>Marque affichée</span>
+      <input type="text" name="marque_override"
+             value="{{ model.marque_override or '' }}"
+             placeholder="{{ model.marque }}">
+    </label>
+    <label>
+      <span>Modèle affiché</span>
+      <input type="text" name="modele_override"
+             value="{{ model.modele_override or '' }}"
+             placeholder="{{ model.modele }}">
+    </label>
+    <label>
+      <span>Catégorie</span>
+      <input type="text" name="categorie" value="{{ model.categorie or '' }}">
+    </label>
+  </div>
+  <p class="hint">
+    Laisser vide pour garder la valeur de l'export. La correction s'applique
+    partout — liste des imprimantes, compatibilités et kiosque — et survit aux
+    imports suivants.
+  </p>
+  <div class="actions">
+    <a class="btn" href="/admin/modeles">Annuler</a>
+    <button type="submit" class="primary">Enregistrer</button>
+  </div>
+</form>
+
+<section class="panel">
+  <h2>Appareils de ce modèle <span class="count">{{ printers|length }}</span></h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Nom</th><th>Salle</th><th>Statut</th><th>S/N</th></tr></thead>
+      <tbody>
+        {% for p in printers %}
+        <tr class="{{ 'is-absent' if p.etat == 'absent' }}">
+          <td>{{ p.nom }}</td>
+          <td>{{ p.salle or '—' }}</td>
+          <td>
+            {% if p.etat == 'absent' %}<span class="tag grey">absente</span>
+            {% elif p.statut == 'entrepot' %}<span class="tag blue">entrepôt</span>
+            {% else %}<span class="tag green">installée</span>{% endif %}
+          </td>
+          <td class="mono">{{ p.serial or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{% endblock %}

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -116,3 +116,65 @@ def printers_list(
             "etat": etat,
         },
     )
+
+
+# ─────────────────────────── Modelle korrigieren ─────────────────────
+
+
+@router.get("/admin/modeles", response_class=HTMLResponse)
+def models_list(request: Request, session: Session = Depends(get_session)) -> HTMLResponse:
+    models = list(
+        session.scalars(select(PrinterModel).order_by(PrinterModel.marque, PrinterModel.modele)).all()
+    )
+    return templates.TemplateResponse(
+        request,
+        "models.html",
+        {"models": models, "counts": printer_counts(session)},
+    )
+
+
+@router.get("/admin/modeles/{model_id}", response_class=HTMLResponse)
+def model_form(
+    model_id: int, request: Request, session: Session = Depends(get_session)
+) -> HTMLResponse:
+    model = session.get(PrinterModel, model_id)
+    if model is None:
+        raise HTTPException(status_code=404, detail="Modèle introuvable")
+
+    printers = list(
+        session.scalars(
+            select(Printer).where(Printer.model_id == model_id).order_by(Printer.nom)
+        ).all()
+    )
+    return templates.TemplateResponse(
+        request,
+        "model_form.html",
+        {"model": model, "printers": printers},
+    )
+
+
+@router.post("/admin/modeles/{model_id}")
+def model_save(
+    model_id: int,
+    session: Session = Depends(get_session),
+    marque_override: str = Form(""),
+    modele_override: str = Form(""),
+    categorie: str = Form(""),
+) -> RedirectResponse:
+    """Anzeigekorrektur speichern.
+
+    Marke und Modell aus der Excel bleiben unangetastet — sie bilden die
+    Identität für den Re-Import. Korrigiert wird nur, was angezeigt wird.
+    """
+    model = session.get(PrinterModel, model_id)
+    if model is None:
+        raise HTTPException(status_code=404, detail="Modèle introuvable")
+
+    marque = marque_override.strip()
+    modele = modele_override.strip()
+    model.marque_override = marque if marque and marque != model.marque else None
+    model.modele_override = modele if modele and modele != model.modele else None
+    if categorie.strip():
+        model.categorie = categorie.strip()
+    session.commit()
+    return RedirectResponse(f"/admin/modeles/{model_id}?ok=1", status_code=303)

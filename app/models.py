@@ -52,8 +52,12 @@ class PrinterModel(Base):
     slug: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     categorie: Mapped[str | None] = mapped_column(String(120))
     categorie_id: Mapped[int | None] = mapped_column(Integer)
-    # Korrektur, falls die Marke im Quellsystem falsch erfasst ist (z. B. SC-T5100)
+    # Korrekturen, falls das Quellsystem falsch erfasst hat (z. B. SC-T5100,
+    # dort als Brother geführt, tatsächlich eine Epson SureColor).
+    # Reine Anzeigekorrektur: die Identität für den Re-Import bleibt der slug
+    # aus den Originalwerten, ein Import überschreibt die Korrektur also nicht.
     marque_override: Mapped[str | None] = mapped_column(String(120))
+    modele_override: Mapped[str | None] = mapped_column(String(120))
     # 0 = noch kein Verbrauchsmaterial zugeordnet
     mapping_ok: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
@@ -64,8 +68,20 @@ class PrinterModel(Base):
         return self.marque_override or self.marque
 
     @property
+    def modele_affiche(self) -> str:
+        return self.modele_override or self.modele
+
+    @property
     def libelle(self) -> str:
-        return f"{self.marque_affichee} {self.modele}"
+        return f"{self.marque_affichee} {self.modele_affiche}"
+
+    @property
+    def corrige(self) -> bool:
+        return bool(self.marque_override or self.modele_override)
+
+    @property
+    def libelle_source(self) -> str:
+        return f"{self.marque} {self.modele}"
 
 
 class Printer(Base):
