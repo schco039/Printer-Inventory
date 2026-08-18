@@ -17,6 +17,7 @@ from sqlalchemy import or_
 from app.db import get_session, get_setting
 from app.deps import templates
 from app.models import AppUser, Consumable, Printer, PrinterModel
+from app.badge_bus import einloesen
 from app.security import badge_hash
 from app.services import kiosk_groups, record_movement, stock_for
 
@@ -170,6 +171,7 @@ def book(
     quantite: int = Form(1),
     user_id: int = Form(0),
     badge: str = Form(""),
+    ticket: str = Form(""),
     sens: str = Form("sortie"),
 ) -> Response:
     consumable = session.get(Consumable, consumable_id)
@@ -182,8 +184,10 @@ def book(
     # Person bestimmen: Badge hat Vorrang, sonst Auswahl aus der Liste
     user: AppUser | None = None
     badge_type: str | None = None
-    if badge.strip():
-        digest = badge_hash(badge)
+    # Ticket: PC/SC-Leser über den Lesedienst. badge: Leser im Tastaturmodus.
+    digest = einloesen(ticket.strip()) if ticket.strip() else None
+    if digest or badge.strip():
+        digest = digest or badge_hash(badge)
         user = session.scalar(
             select(AppUser).where(
                 AppUser.actif == 1,

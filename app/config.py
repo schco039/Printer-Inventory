@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     admin_user: str = "admin"
     admin_password: str = ""
 
+    # Gemeinsames Geheimnis für den Kartenleser-Dienst (tools/badge_agent.py).
+    # Leer = die Schnittstelle /api/badge/scan ist abgeschaltet.
+    badge_agent_token: str = ""
+
     default_locale: str = "fr"
     tz: str = "Europe/Luxembourg"
 

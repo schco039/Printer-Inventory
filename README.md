@@ -189,6 +189,59 @@ Nach Änderungen am Datenmodell:
 
 ---
 
+## Kartenleser anschließen
+
+Es gibt zwei Bauarten, und der Unterschied ist entscheidend:
+
+| Bauart | Verhalten | Was nötig ist |
+|---|---|---|
+| **Tastatur-Leser** (HID) | tippt die Kartennummer wie eine Tastatur | nichts — Feld anklicken, Karte auflegen |
+| **PC/SC-Leser** (z. B. **Gemalto Prox-SU**) | meldet sich als Kartenleser, tippt nichts, für den Browser unsichtbar | kleiner Lesedienst, siehe unten |
+
+Welche Bauart vorliegt, verrät der Geräte-Manager: erscheint das Gerät unter
+*Smartcard-Lesegeräte*, ist es PC/SC.
+
+### Lesedienst für PC/SC-Leser
+
+Der Dienst läuft am Rechner mit dem Leser — also am Kiosk-Pi und/oder am
+Verwaltungs-PC — liest die Karte und meldet die Nummer an den Server. Die
+Weboberfläche fragt dort kurz zyklisch nach.
+
+```bash
+pip install pyscard
+python tools/badge_agent.py --server http://SERVER:8080 --token <BADGE_AGENT_TOKEN>
+```
+
+Den Token erzeugt `install.sh` automatisch; er steht in `.env`.
+
+Auf dem Raspberry Pi zusätzlich `sudo apt install pcscd python3-pyscard`, dann
+dauerhaft als Dienst einrichten — Vorlage und Anleitung in
+[tools/lgk-badge-agent.service](tools/lgk-badge-agent.service).
+
+Mehrere Leser im Haus? Jeder Dienst bekommt `--station kiosk` beziehungsweise
+`--station bureau`, und die zugehörige Seite wird mit `?station=kiosk`
+aufgerufen. Bei nur einem Leser ist nichts einzustellen.
+
+### Prüfen, ob ein Leser taugt
+
+```bash
+python tools/badge_probe.py
+```
+
+Zeigt, ob der Leser gefunden wird, welche Nummer eine Karte liefert und — der
+wichtige Punkt — ob dieselbe Karte **immer dieselbe Nummer** liefert. Manche
+Karten senden aus Datenschutzgründen bei jeder Lesung eine andere Nummer und
+taugen dann nicht als Ausweis.
+
+### Was über die Leitung geht
+
+Der Dienst schickt die rohe Kartennummer an den Server; dieser verrechnet sie
+sofort zu ihrem HMAC und verwirft sie. Der Browser bekommt nur ein
+kurzlebiges Einmal-Ticket, nie die Nummer und nie den Hash. Der Token
+verhindert, dass beliebige Geräte im Netz Lesungen einspeisen.
+
+---
+
 ## Betrieb neben anderen Diensten
 
 Die Anwendung ist als Mitbewohner auf einem Docker-Host gedacht, auf dem schon

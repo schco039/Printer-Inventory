@@ -78,11 +78,14 @@
         {% endif %}
       </td>
       <td>
-        <form method="post" action="/admin/utilisateurs/{{ u.id }}/badge" class="inline-form badge-form">
+        <form method="post" action="/admin/utilisateurs/{{ u.id }}/badge"
+              class="inline-form badge-form" data-badge-form>
           <input type="hidden" name="type" value="{{ type }}">
+          <input type="hidden" name="ticket" value="">
           <input type="text" name="uid" autocomplete="off" spellcheck="false"
-                 placeholder="cliquez ici, puis présentez le badge…"
+                 placeholder="lecteur clavier : cliquez puis présentez la carte"
                  class="badge-input mono">
+          <button type="button" class="lire">Lire la carte</button>
           <button type="submit">{{ 'Remplacer' if enregistre else 'Enregistrer' }}</button>
         </form>
       </td>
@@ -104,4 +107,60 @@
 <p class="hint">Aucun utilisateur. Ajoutez au moins une personne pour pouvoir utiliser le kiosque.</p>
 {% endif %}
 
+{% endblock %}
+
+{% block script %}
+<script>
+// "Lire la carte" fragt beim Lesedienst nach (PC/SC-Leser wie Gemalto Prox-SU).
+// Leser im Tastaturmodus tippen stattdessen direkt ins Textfeld.
+(function () {
+  var station = (function () {
+    var m = window.location.search.match(/[?&]station=([^&]+)/);
+    return m ? decodeURIComponent(m[1]) : 'default';
+  })();
+
+  var formulare = document.querySelectorAll('[data-badge-form]');
+  for (var i = 0; i < formulare.length; i++) {
+    (function (formular) {
+      var knopf = formular.querySelector('.lire');
+      var ticket = formular.querySelector('input[name=ticket]');
+      var feld = formular.querySelector('input[name=uid]');
+      if (!knopf) { return; }
+
+      knopf.addEventListener('click', function () {
+        var rest = 20;
+        knopf.disabled = true;
+        var urspruenglich = knopf.textContent;
+        feld.placeholder = 'présentez la carte sur le lecteur…';
+
+        var timer = setInterval(function () {
+          rest -= 1;
+          knopf.textContent = 'En attente… ' + rest + ' s';
+          if (rest <= 0) {
+            clearInterval(timer);
+            knopf.disabled = false;
+            knopf.textContent = urspruenglich;
+            feld.placeholder = 'aucune carte lue — le service tourne-t-il ?';
+            return;
+          }
+          var x = new XMLHttpRequest();
+          x.open('GET', '/api/badge/pending?station=' + encodeURIComponent(station), true);
+          x.onreadystatechange = function () {
+            if (x.readyState !== 4 || x.status !== 200) { return; }
+            try {
+              var r = JSON.parse(x.responseText);
+              if (r.ready && r.ticket) {
+                clearInterval(timer);
+                ticket.value = r.ticket;
+                formular.submit();
+              }
+            } catch (e) {}
+          };
+          x.send();
+        }, 800);
+      });
+    })(formulare[i]);
+  }
+})();
+</script>
 {% endblock %}

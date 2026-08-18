@@ -634,10 +634,20 @@ stärkste Argument dafür, den Kiosk vor der Rentrée betriebsbereit zu haben.
 
 ### Hardware
 
-**RFID-Reader als USB-HID-Keyboard-Wedge, 13,56 MHz (MIFARE/DESFire).**
-Kein Treiber, kein GPIO-Daemon, keine Python-Bibliothek auf dem Pi — der Reader
-tippt die UID in ein fokussiertes, unsichtbares Eingabefeld, die Web-App
-verarbeitet `Enter`. Funktioniert mit jedem Browser.
+**Zwei Bauarten werden unterstützt.**
+
+*Tastatur-Leser (HID-Keyboard-Wedge)* tippen die UID in ein fokussiertes Feld —
+kein Treiber, kein Dienst, funktioniert mit jedem Browser.
+
+*PC/SC-Leser* melden sich beim Betriebssystem als Kartenleser an und tippen
+nichts; ein Browser hat auf diese Schnittstelle keinen Zugriff. Für sie liest
+ein kleiner Dienst (`tools/badge_agent.py`) die Karte und meldet die UID an den
+Server, die Seite fragt dort zyklisch nach (`/api/badge/pending`) und bekommt
+ein Einmal-Ticket. Die rohe UID wird auf dem Server sofort gehasht und
+verworfen; Browser und Netzwerk sehen sie nie wieder.
+
+**Im Einsatz ist ein Gemalto Prox-SU** — ein PC/SC-Leser mit kontaktloser
+Schnittstelle. Der Lesedienst ist damit der reguläre Weg, nicht die Ausnahme.
 
 **myCard und Salto teilen sich denselben Reader** (beide 13,56 MHz). Jeder
 Benutzer hat genau **zwei Felder**: `mycard_hash` und `salto_hash`. Beide
@@ -661,19 +671,16 @@ gespeichert**. Damit ist die Datenbank auch bei Diebstahl kein
 Kartenklon-Werkzeug. Ist eine UID bereits einer anderen Person zugeordnet,
 lehnt das System das Anlernen mit Klartextmeldung ab (`UNIQUE`-Constraint).
 
-### Risiko, das früh geprüft werden muss
+### Geprüft und erledigt: stabile UIDs
 
-Salto-Badges sind je nach Konfiguration **MIFARE DESFire mit Random UID**
-(Privacy-Mode). Dann liefert der Reader bei jeder Lesung eine andere UID und
-das Verfahren funktioniert nicht. Das ist mit 20 Minuten und einem Test-Reader
-zu klären, **bevor** Code dafür geschrieben wird. Fallback, falls Random UID
-aktiv ist: Salto-Badges weglassen und nur myCard verwenden, oder PIN
-(`app_user.pin_hash` ist dafür bereits vorgesehen).
+Das größte Projektrisiko war die Frage, ob die Karten eine **zufällige UID**
+liefern (DESFire im Privacy-Mode). Am 05.08.2026 mit dem echten Gemalto Prox-SU
+gemessen: beide Kartentypen liefern **7-Byte-UIDs, bei jeder Lesung identisch**
+(vier bzw. drei Wiederholungen). Damit sind beide als Ausweis brauchbar, und
+`app_user.pin_hash` bleibt ungenutzte Reserve.
 
-Zweite Falle: HID-Reader tippen nach einem festen Tastaturlayout. Steht der Pi
-auf AZERTY und der Reader sendet QWERTY-Scancodes, kommen falsche Zeichen an.
-→ Reader auf reine Ziffernausgabe konfigurieren oder Pi-Layout anpassen.
-Ebenfalls ein 20-Minuten-Test vorab.
+Die zweite Falle — falsches Tastaturlayout — entfällt bei einem PC/SC-Leser
+vollständig, weil keine Tastendrücke im Spiel sind.
 
 ### Berechtigungen
 

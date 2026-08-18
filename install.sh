@@ -73,9 +73,11 @@ if [ ! -f .env ]; then
   info "Erstelle .env mit zufälligen Geheimnissen…"
   APP_SECRET="$(random_hex 32)"
   ADMIN_PASSWORD="$(random_password)"
+  BADGE_AGENT_TOKEN="$(random_hex 24)"
 
   sed -e "s|^APP_SECRET=.*|APP_SECRET=${APP_SECRET}|" \
       -e "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD=${ADMIN_PASSWORD}|" \
+      -e "s|^BADGE_AGENT_TOKEN=.*|BADGE_AGENT_TOKEN=${BADGE_AGENT_TOKEN}|" \
       .env.example > .env
   chmod 600 .env
   ok ".env erstellt"
@@ -176,6 +178,10 @@ if [ "$NEW_INSTALL" -eq 1 ]; then
   echo
 fi
 echo "  Nächster Schritt:  Excel-Export unter /admin/import hochladen"
+echo
+echo "  Kartenleser (PC/SC, z. B. Gemalto Prox-SU):"
+echo "    Token steht in .env als BADGE_AGENT_TOKEN"
+echo "    python3 tools/badge_agent.py --server http://${HOST_IP}:${APP_PORT} --token <TOKEN>"
 echo
 echo "  Update:            git pull && ./install.sh"
 echo "  Logs:              $COMPOSE logs -f app"

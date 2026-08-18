@@ -16,6 +16,7 @@ from app.auth import require_admin
 from app.db import get_session
 from app.deps import templates
 from app.models import AppUser, Movement
+from app.badge_bus import einloesen
 from app.security import badge_hash
 
 router = APIRouter(dependencies=[Depends(require_admin)])
@@ -95,8 +96,13 @@ def enroll_badge(
     session: Session = Depends(get_session),
     type: str = Form(...),
     uid: str = Form(""),
+    ticket: str = Form(""),
 ) -> RedirectResponse:
-    """Badge anlernen. Die UID verlässt diese Funktion nie im Klartext."""
+    """Badge anlernen. Die UID verlässt diese Funktion nie im Klartext.
+
+    Zwei Wege: 'ticket' kommt vom Lesedienst für PC/SC-Leser, 'uid' von einem
+    Leser im Tastaturmodus, der direkt ins Feld tippt.
+    """
     user = session.get(AppUser, user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="Utilisateur introuvable")
@@ -104,7 +110,7 @@ def enroll_badge(
     if field is None:
         raise HTTPException(status_code=400, detail="Type de badge inconnu")
 
-    digest = badge_hash(uid)
+    digest = einloesen(ticket.strip()) if ticket.strip() else badge_hash(uid)
     if not digest:
         return RedirectResponse(
             "/admin/utilisateurs?erreur=Aucun+badge+lu+—+réessayez", status_code=303

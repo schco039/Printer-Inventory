@@ -32,9 +32,10 @@
     <div class="k-badge">
       <div class="k-badge-icon">▮▮▮</div>
       <p class="k-badge-text">Présentez votre badge sur le lecteur</p>
-      <input type="password" name="badge" id="badge" autocomplete="off"
+      <input type="text" name="badge" id="badge" autocomplete="off"
              autofocus inputmode="none" class="k-badge-input">
-      <p class="k-hint">myCard ou Salto — les deux fonctionnent.</p>
+      <input type="hidden" name="ticket" id="ticket" value="">
+      <p class="k-hint" id="badge-etat">myCard ou Salto — les deux fonctionnent.</p>
     </div>
     {% elif users %}
     <span class="k-label">Qui ?</span>
@@ -70,8 +71,10 @@
     input.value = v;
   }
 
-  // Der RFID-Leser meldet sich als Tastatur und tippt die UID gefolgt von
-  // Enter. Das Feld bleibt deshalb dauerhaft fokussiert.
+  // Zwei Arten von Lesern werden unterstützt:
+  //  - Tastatur-Leser tippen die UID direkt ins Feld (bleibt fokussiert)
+  //  - PC/SC-Leser (z. B. Gemalto Prox-SU) melden über den Lesedienst;
+  //    diese Seite fragt dann kurz zyklisch nach
   (function () {
     var badge = document.getElementById('badge');
     if (!badge) { return; }
@@ -79,6 +82,36 @@
     focusBadge();
     setInterval(focusBadge, 800);
     document.addEventListener('click', focusBadge, true);
+
+    var ticket = document.getElementById('ticket');
+    var etat = document.getElementById('badge-etat');
+    var formular = badge.form;
+    var station = (function () {
+      var m = window.location.search.match(/[?&]station=([^&]+)/);
+      return m ? decodeURIComponent(m[1]) : 'default';
+    })();
+    var laeuft = false;
+
+    setInterval(function () {
+      if (laeuft) { return; }
+      laeuft = true;
+      var x = new XMLHttpRequest();
+      x.open('GET', '/api/badge/pending?station=' + encodeURIComponent(station), true);
+      x.onreadystatechange = function () {
+        if (x.readyState !== 4) { return; }
+        laeuft = false;
+        if (x.status !== 200) { return; }
+        try {
+          var r = JSON.parse(x.responseText);
+          if (r.ready && r.ticket) {
+            ticket.value = r.ticket;
+            if (etat && r.nom) { etat.textContent = r.nom; }
+            formular.submit();
+          }
+        } catch (e) {}
+      };
+      x.send();
+    }, 700);
   })();
 </script>
 {% endblock %}
