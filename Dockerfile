@@ -1,4 +1,10 @@
-FROM python:3.12-slim
+# Basis-Image umstellbar: Docker Hub drosselt anonyme Downloads pro IP
+# (429 Too Many Requests). In einer Schule teilen sich alle Rechner dieselbe
+# Adresse, das Kontingent ist also schnell aufgebraucht. Über PYTHON_IMAGE in
+# der .env lässt sich ein Spiegel verwenden, z. B.
+#   PYTHON_IMAGE=mirror.gcr.io/library/python:3.12-slim
+ARG PYTHON_IMAGE=python:3.12-slim
+FROM ${PYTHON_IMAGE}
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
