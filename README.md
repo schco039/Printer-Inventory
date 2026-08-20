@@ -56,10 +56,9 @@ cd lgk-printer
 .\run.ps1
 ```
 
-Das Skript erzeugt beim ersten Lauf eine `.env` mit zufälligem `APP_SECRET`
-und einem zufälligen Admin-Passwort, legt `./data` an, baut das Image und
-startet den Container. Das Passwort wird **einmalig** am Ende angezeigt und
-steht danach in `.env`.
+Das Skript erzeugt beim ersten Lauf eine `.env` mit zufälligem `APP_SECRET`,
+legt `./data` an, baut das Image und startet den Container. Den ersten
+Administrator legst du danach im Browser unter `/setup` an.
 
 Danach erreichbar unter:
 
@@ -67,6 +66,7 @@ Danach erreichbar unter:
 |---|---|
 | Admin | `http://<host>:8080/admin` |
 | Kiosk | `http://<host>:8080/kiosk` |
+| Erste Einrichtung | `http://<host>:8080/setup` |
 | Health | `http://<host>:8080/healthz` |
 
 ### Update
@@ -82,15 +82,15 @@ beim Start automatisch.
 
 ## Erste Schritte
 
+0. **Administrator anlegen** — beim ersten Aufruf leitet die Anwendung auf `/setup`
 1. **Import** — `/admin/import`, Excel-Export hochladen, Diff-Vorschau prüfen,
    *Confirmer et appliquer*
 2. **Konfigurieren** — `/admin/compatibilites`, je Modell auf *Configurer*.
    Der Assistent legt einen kompletten Satz (BK/C/M/Y + Trommel) in einem
    Schritt an; du tippst nur die Bestellnummern. Teilen sich zwei Modelle
    dieselben Kartuschen: *Copier depuis un autre modèle*
-3. **Personen und Badges** — `/admin/utilisateurs`. Person anlegen, dann je
-   Badge ins Feld klicken und die Karte an den Leser halten. myCard und Salto
-   sind getrennte Felder, beide funktionieren am Kiosk
+3. **Personen** — `/admin/utilisateurs`, Person anlegen. Der Code wird erzeugt
+   und einmalig angezeigt — notieren und weitergeben
 4. **Inventur** — `/admin/inventaire`, Lager zählen und als Anfangsbestand buchen
 5. **Kiosk** — `/kiosk` auf dem Touchscreen, ab jetzt wird gebucht
 
@@ -114,16 +114,15 @@ werden als `absent` markiert.
 - Benutzerliste
 
 **M3 — Kiosk**
-- Modell ▸ Farbe ▸ Menge ▸ Person ▸ Buchung, Rückgabe ebenso
+- Anmeldung ▸ Modell ▸ Farbe ▸ Menge ▸ Buchung, Rückgabe ebenso
 - Markenebene erscheint automatisch ab der zweiten Marke
-- Modelle ohne Material ausgegraut, Bestand 0 gesperrt, Auto-Reset nach 45 s
+- Modelle ohne Material ausgegraut, Bestand 0 gesperrt
 
-**M4 — Badges**
-- myCard und Salto je Person, beide gleichwertig am Kiosk
-- Gespeichert wird nur HMAC-SHA256 der UID, nie die Kartennummer
-- Ein Badge kann nicht zwei Personen gehören
-- Solange kein Badge angelernt ist, bleibt die Namensliste stehen —
-  danach schaltet der Kiosk automatisch in den Badge-Modus
+**M4 — Anmeldung mit Code**
+- Ein Code je Person, gültig am Kiosk (Name + Code) und im Web (Anmeldename + Code)
+- Kiosk: Namenskacheln, Zifferntastatur, Sitzung mit Zeitablauf
+- PBKDF2-Hash, Sperre nach fünf Fehlversuchen, Entsperren durch Administrator
+- Ersteinrichtung über `/setup`, danach gesperrt
 
 **M5 — Wareneingang**
 - Lieferung mit Lieferant, Lieferschein-Nr., Datum und Zeilen
@@ -151,12 +150,12 @@ app/
   models.py       Datenmodell (SPEC 4)
   importer.py     Excel-Import (SPEC 5)
   services.py     Bestand, Buchungen, Schuljahr, Saison, Vorschläge
-  security.py     Badge-Hashing (HMAC)
+  security.py     PIN-Hashing und Sperrlogik
+  auth.py         Anmeldung, Sitzungen (Web und Kiosk)
   backup.py       tägliche SQLite-Sicherung
   db.py           Session + Einstellungen
-  auth.py         Basic-Auth für /admin
-  routers/        printers · imports · consumables · stock · deliveries ·
-                  reports · users · kiosk
+  routers/        auth_routes · printers · imports · consumables · stock ·
+                  deliveries · reports · users · kiosk
   templates/      Jinja2, Oberfläche auf Französisch
   static/app.css  Admin-CSS
   static/kiosk.css Kiosk-CSS — Touch-Flächen ≥ 64 px, altes Chromium-tauglich
@@ -189,56 +188,45 @@ Nach Änderungen am Datenmodell:
 
 ---
 
-## Kartenleser anschließen
+## Anmeldung
 
-Es gibt zwei Bauarten, und der Unterschied ist entscheidend:
+Jede Person hat **einen Code** — dieselbe Zahl für beide Wege:
 
-| Bauart | Verhalten | Was nötig ist |
-|---|---|---|
-| **Tastatur-Leser** (HID) | tippt die Kartennummer wie eine Tastatur | nichts — Feld anklicken, Karte auflegen |
-| **PC/SC-Leser** (z. B. **Gemalto Prox-SU**) | meldet sich als Kartenleser, tippt nichts, für den Browser unsichtbar | kleiner Lesedienst, siehe unten |
+| Wo | Wie |
+|---|---|
+| **Kiosk** (Touchscreen) | Namenskachel antippen, Code auf der Zifferntastatur eingeben |
+| **Verwaltung** (Browser) | Anmeldename + Code |
 
-Welche Bauart vorliegt, verrät der Geräte-Manager: erscheint das Gerät unter
-*Smartcard-Lesegeräte*, ist es PC/SC.
+Nach der Anmeldung am Kiosk kann man mehrere Sachen hintereinander entnehmen;
+nach zwei Minuten ohne Bedienung meldet der Kiosk von selbst ab, weil das Gerät
+öffentlich steht. Die Dauer steht in den Einstellungen (`kiosk_session_seconds`).
 
-### Lesedienst für PC/SC-Leser
+### Ersteinrichtung
 
-Der Dienst läuft am Rechner mit dem Leser — also am Kiosk-Pi und/oder am
-Verwaltungs-PC — liest die Karte und meldet die Nummer an den Server. Die
-Weboberfläche fragt dort kurz zyklisch nach.
+Beim ersten Aufruf führt die Anwendung auf **`/setup`** und legt dort den ersten
+Administrator an. Danach ist diese Seite gesperrt. Alle weiteren Personen legt
+man unter `Utilisateurs` an; der Code wird dabei zufällig erzeugt und
+**einmalig angezeigt** — notieren und weitergeben.
+
+### Zur Sicherheit vierstelliger Codes
+
+Vier Ziffern sind 10 000 Möglichkeiten. Dagegen hilft kein Hashverfahren,
+sondern die Sperre: **nach fünf Fehlversuchen ist das Konto fünf Minuten
+gesperrt**, ein Administrator kann sofort entsperren. Gespeichert wird der Code
+nur als PBKDF2-Hash, nie im Klartext.
+
+Für Administratorkonten empfiehlt sich ein **längerer Code** — erlaubt sind vier
+bis zwölf Ziffern. Am Kiosk reichen vier; dort wird die Eingabe nach der vierten
+Ziffer automatisch abgeschickt, längere Codes bestätigt man mit *OK*.
+
+### Code vergessen
+
+Ein Administrator vergibt unter `Utilisateurs` einen neuen. Gibt es keinen
+erreichbaren Administrator mehr, hilft nur der Weg über die Datenbank:
 
 ```bash
-pip install pyscard
-python tools/badge_agent.py --server http://SERVER:8080 --token <BADGE_AGENT_TOKEN>
+docker compose exec app python -c "from app.db import SessionLocal; from app.models import AppUser; from app.security import pin_hashen; s=SessionLocal(); u=s.query(AppUser).filter_by(username='cschumacher').first(); u.pin_hash=pin_hashen('123456'); u.bloque_jusqua=None; s.commit(); print('ok')"
 ```
-
-Den Token erzeugt `install.sh` automatisch; er steht in `.env`.
-
-Auf dem Raspberry Pi zusätzlich `sudo apt install pcscd python3-pyscard`, dann
-dauerhaft als Dienst einrichten — Vorlage und Anleitung in
-[tools/lgk-badge-agent.service](tools/lgk-badge-agent.service).
-
-Mehrere Leser im Haus? Jeder Dienst bekommt `--station kiosk` beziehungsweise
-`--station bureau`, und die zugehörige Seite wird mit `?station=kiosk`
-aufgerufen. Bei nur einem Leser ist nichts einzustellen.
-
-### Prüfen, ob ein Leser taugt
-
-```bash
-python tools/badge_probe.py
-```
-
-Zeigt, ob der Leser gefunden wird, welche Nummer eine Karte liefert und — der
-wichtige Punkt — ob dieselbe Karte **immer dieselbe Nummer** liefert. Manche
-Karten senden aus Datenschutzgründen bei jeder Lesung eine andere Nummer und
-taugen dann nicht als Ausweis.
-
-### Was über die Leitung geht
-
-Der Dienst schickt die rohe Kartennummer an den Server; dieser verrechnet sie
-sofort zu ihrem HMAC und verwirft sie. Der Browser bekommt nur ein
-kurzlebiges Einmal-Ticket, nie die Nummer und nie den Hash. Der Token
-verhindert, dass beliebige Geräte im Netz Lesungen einspeisen.
 
 ---
 
@@ -309,8 +297,8 @@ Ausblenden des Mauszeigers.
 ## Sicherheit
 
 - `.env` und `./data` sind in `.gitignore` — **niemals einchecken**
-- `APP_SECRET` nach dem Anlernen von Badges nicht mehr ändern: die
-  Badge-Hashes hängen davon ab und müssten sonst neu angelernt werden
+- `APP_SECRET` signiert die Sitzungscookies. Wird er geändert, muss sich jeder
+  neu anmelden — die Codes selbst bleiben gültig
 - Der Dienst gehört ins interne Netz, nicht ins offene Internet
 - `*.xlsx` ist ebenfalls in `.gitignore`, damit keine Inventardaten
   versehentlich im Repository landen

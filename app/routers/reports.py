@@ -74,7 +74,7 @@ def movements_csv(session: Session = Depends(get_session)) -> StreamingResponse:
     writer = csv.writer(buffer, delimiter=";")
     writer.writerow(
         ["Date", "Annee scolaire", "Mois", "Reference", "Designation",
-         "Quantite", "Motif", "Personne", "Badge", "Note"]
+         "Quantite", "Motif", "Personne", "Note"]
     )
     for m in session.scalars(select(Movement).order_by(Movement.created_at)).all():
         c = consumables.get(m.consumable_id)
@@ -88,7 +88,6 @@ def movements_csv(session: Session = Depends(get_session)) -> StreamingResponse:
                 m.delta,
                 m.motif,
                 users[m.user_id].nom if m.user_id in users else "",
-                m.badge_type or "",
                 m.note or "",
             ]
         )

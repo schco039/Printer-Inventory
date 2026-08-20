@@ -168,18 +168,39 @@ body.kiosk {
 }
 .k-confirm:active { background: #1a8355; }
 
-.k-badge {
-  display: flex; flex-direction: column; align-items: center; gap: 12px;
-  background: var(--k-panel); border: 2px dashed var(--k-line);
-  border-radius: 14px; padding: 28px 20px;
+.k-badge-text { font-size: 22px; margin: 0 0 18px; text-align: center; }
+
+/* Namenskacheln: mehr Spalten als bei den Marken */
+.k-people-tiles .k-tile { flex: 1 1 260px; min-height: 110px; }
+
+/* PIN-Eingabe */
+.k-pin-form { max-width: 460px; margin: 0 auto; text-align: center; }
+.k-pin-display {
+  display: flex; justify-content: center; gap: 16px; margin-bottom: 26px;
 }
-.k-badge-icon { font-size: 40px; letter-spacing: 4px; color: var(--k-accent); }
-.k-badge-text { font-size: 20px; margin: 0; }
-.k-badge-input {
-  width: 220px; height: 54px; text-align: center; font-size: 22px;
-  background: var(--k-bg); color: var(--k-ink);
-  border: 1px solid var(--k-line); border-radius: 10px;
+.k-pin-dot {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 2px solid var(--k-line); background: transparent;
 }
+.k-pin-dot.on { background: var(--k-accent); border-color: var(--k-accent); }
+
+.k-pad {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+}
+.k-key {
+  min-height: 84px; font-size: 30px; font-weight: 600;
+  background: var(--k-panel); color: var(--k-ink);
+  border: 1px solid var(--k-line); border-radius: 14px;
+}
+.k-key:active { background: var(--k-accent); }
+.k-key-ok { background: var(--k-ok); border-color: var(--k-ok); color: #fff; }
+.k-key-ok:active { background: #1a8355; }
+
+.k-user {
+  padding: 8px 14px; border-radius: 10px; background: var(--k-line);
+  color: var(--k-ink); text-decoration: none; font-size: 16px;
+}
+.k-user:active { background: var(--k-accent); }
 
 .k-hint { color: var(--k-muted); font-size: 15px; margin-top: 12px; }
 .k-error {

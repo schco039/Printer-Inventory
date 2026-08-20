@@ -13,7 +13,7 @@ jährlichen Excel-Export des Hauptlagerprogramms.
 ### In Scope
 
 - Bestand an Verbrauchsmaterial (Toner, Trommeln, ggf. Tinte) führen
-- Entnahme am Touchscreen: **Modell → Farbe → entnehmen**, bestätigt per RFID-Badge
+- Entnahme am Touchscreen: **anmelden → Modell → Farbe → entnehmen**
 - Lückenlose Historie: wer hat wann was entnommen oder zurückgelegt
 - Wareneingang: gelieferte Ware am PC einpflegen
 - Jährlicher Excel-Import des Druckerbestands (keine API vorhanden)
@@ -142,8 +142,8 @@ als JSON mitgeschrieben (Nachvollziehbarkeit, s. `import_run`).
 ┌──────────────────────────┐
 │  RPi + Touchscreen       │
 │  Chromium --kiosk        │
-│  ├─ RFID-Reader (USB-HID)│      LAN / HTTP
-│  └─ Barcode (USB-HID)    │ ─────────────────┐
+│  Anmeldung: Name + Code  │      LAN / HTTP
+│  Barcode optional (HID)  │ ─────────────────┐
 └──────────────────────────┘                  │
                                               ▼
 ┌──────────────────────────┐        ┌──────────────────────┐
@@ -630,64 +630,82 @@ stärkste Argument dafür, den Kiosk vor der Rentrée betriebsbereit zu haben.
 
 ---
 
-## 7. Authentifizierung und Badges
+## 7. Anmeldung mit Zahlencode
 
-### Hardware
+RFID wurde nach dem ersten Praxistest verworfen und durch einen Zahlencode
+ersetzt. Ausschlaggebend war nicht die Technik — die Karten lieferten stabile
+UIDs —, sondern der Betrieb: ein Code braucht keinen Leser, keinen zusätzlichen
+Dienst auf dem Pi und funktioniert am Kiosk wie im Browser gleichermaßen.
 
-**Zwei Bauarten werden unterstützt.**
+### Ein Code, zwei Wege
 
-*Tastatur-Leser (HID-Keyboard-Wedge)* tippen die UID in ein fokussiertes Feld —
-kein Treiber, kein Dienst, funktioniert mit jedem Browser.
+| Ort | Ablauf |
+|---|---|
+| **Kiosk** | Namenskachel antippen, Code auf der Zifferntastatur, danach entnehmen |
+| **Verwaltung** | Anmeldename + derselbe Code |
 
-*PC/SC-Leser* melden sich beim Betriebssystem als Kartenleser an und tippen
-nichts; ein Browser hat auf diese Schnittstelle keinen Zugriff. Für sie liest
-ein kleiner Dienst (`tools/badge_agent.py`) die Karte und meldet die UID an den
-Server, die Seite fragt dort zyklisch nach (`/api/badge/pending`) und bekommt
-ein Einmal-Ticket. Die rohe UID wird auf dem Server sofort gehasht und
-verworfen; Browser und Netzwerk sehen sie nie wieder.
-
-**Im Einsatz ist ein Gemalto Prox-SU** — ein PC/SC-Leser mit kontaktloser
-Schnittstelle. Der Lesedienst ist damit der reguläre Weg, nicht die Ausnahme.
-
-**myCard und Salto teilen sich denselben Reader** (beide 13,56 MHz). Jeder
-Benutzer hat genau **zwei Felder**: `mycard_hash` und `salto_hash`. Beide
-sind optional, beide funktionieren gleichwertig am Kiosk. Welcher Badge
-benutzt wurde, steht in `movement.badge_type` — nebenbei ein guter Indikator
-dafür, welche Karte die Leute im Alltag tatsächlich dabeihaben.
-
-### Anlernen
-
-Unter `Utilisateurs` pro Person zwei Zeilen:
+Am Kiosk wird **zuerst angemeldet**, dann entnommen. Damit sind mehrere
+Entnahmen hintereinander ohne erneute Eingabe möglich. Nach zwei Minuten ohne
+Bedienung meldet der Kiosk selbsttätig ab — das Gerät steht öffentlich.
 
 ```
-Paul Muller                                     [ Enregistrer ]
-  myCard   ●  enregistrée le 12.09.2026        [ Réinitialiser ]
-  Salto    ○  non enregistrée                  [ Scanner… ]
+┌──────────────────────────────────────────────┐
+│  Qui êtes-vous ?                     14:32   │
+├──────────────────────────────────────────────┤
+│   ┌────────────────┐  ┌────────────────┐     │
+│   │  Anne Weber    │  │ Conny Schu…    │     │
+│   └────────────────┘  └────────────────┘     │
+│   ┌────────────────┐                         │
+│   │  Paul Muller   │                         │
+│   └────────────────┘                         │
+└──────────────────────────────────────────────┘
+                      ↓
+┌──────────────────────────────────────────────┐
+│  ‹ Retour     Paul Muller                    │
+├──────────────────────────────────────────────┤
+│              Entrez votre code               │
+│                ● ● ○ ○                       │
+│            ┌───┬───┬───┐                     │
+│            │ 1 │ 2 │ 3 │                     │
+│            │ 4 │ 5 │ 6 │                     │
+│            │ 7 │ 8 │ 9 │                     │
+│            │ ← │ 0 │OK │                     │
+│            └───┴───┴───┘                     │
+└──────────────────────────────────────────────┘
 ```
 
-„Scanner…" öffnet ein Feld, Badge an den Reader halten, fertig. Die UID wird
-sofort mit einem Server-Secret zu HMAC-SHA256 gehasht; **die rohe UID wird nie
-gespeichert**. Damit ist die Datenbank auch bei Diebstahl kein
-Kartenklon-Werkzeug. Ist eine UID bereits einer anderen Person zugeordnet,
-lehnt das System das Anlernen mit Klartextmeldung ab (`UNIQUE`-Constraint).
+Vier Ziffern werden automatisch abgeschickt; längere Codes bestätigt man mit
+*OK*. Ein angeschlossener Ziffernblock funktioniert ebenfalls.
 
-### Geprüft und erledigt: stabile UIDs
+### Sicherheit — ehrlich betrachtet
 
-Das größte Projektrisiko war die Frage, ob die Karten eine **zufällige UID**
-liefern (DESFire im Privacy-Mode). Am 05.08.2026 mit dem echten Gemalto Prox-SU
-gemessen: beide Kartentypen liefern **7-Byte-UIDs, bei jeder Lesung identisch**
-(vier bzw. drei Wiederholungen). Damit sind beide als Ausweis brauchbar, und
-`app_user.pin_hash` bleibt ungenutzte Reserve.
+Vier Ziffern sind 10 000 Möglichkeiten. **Kein Hashverfahren macht das gegen
+automatisiertes Durchprobieren sicher.** Der eigentliche Schutz ist die Sperre:
 
-Die zweite Falle — falsches Tastaturlayout — entfällt bei einem PC/SC-Leser
-vollständig, weil keine Tastendrücke im Spiel sind.
+- Gespeichert wird PBKDF2-SHA256 mit 200 000 Iterationen und Salz je Person
+- **Nach fünf Fehlversuchen fünf Minuten gesperrt**, danach von vorn
+- Ein Administrator kann sofort entsperren
+- Erlaubt sind vier bis zwölf Ziffern; für Administratorkonten ist ein längerer
+  Code empfohlen und in der Oberfläche auch so benannt
 
-### Berechtigungen
+Für einen Materialschrank im internen Schulnetz ist das angemessen. Für einen
+aus dem Internet erreichbaren Dienst wäre es das nicht — die Anwendung gehört
+weiterhin ins LAN.
 
-- **Kiosk**: Badge genügt für Entnahme/Rückgabe. Keine Session, keine Anmeldung —
-  jede Buchung wird einzeln legitimiert. Das ist die „Restaurant"-Logik.
-- **Admin/Réception**: Passwort-Login (Session-Cookie), Rolle `admin`.
-  Erreichbar nur vom Büro-Netz, nicht vom Kiosk-Bildschirm.
+### Ersteinrichtung und Aussperrung
+
+Solange kein Administrator mit Code existiert, führt jeder Aufruf von `/admin`
+auf `/setup`, wo der erste angelegt wird. Danach ist diese Seite gesperrt.
+
+Gibt es keinen erreichbaren Administrator mehr, hilft der dokumentierte Weg über
+die Datenbank (`docker compose exec`, siehe README). Bewusst kein Hintertür-Konto
+und kein festes Notfallpasswort in der `.env`.
+
+### Sitzungen
+
+Signiertes Cookie (`APP_SECRET`), zwei Arten im selben Cookie: `web` mit acht
+Stunden, `kiosk` mit zwei Minuten gleitendem Fenster. Wird `APP_SECRET`
+geändert, sind alle Sitzungen ungültig — die Codes bleiben gültig.
 
 ---
 

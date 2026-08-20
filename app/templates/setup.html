@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Première configuration — Consommables LGK</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <link rel="icon" href="data:,">
+</head>
+<body class="centre">
+
+<main class="carte-connexion large-carte">
+  <h1>Première configuration</h1>
+  <p class="hint">
+    Aucun administrateur n'existe encore. Créez le premier compte — c'est avec
+    celui-ci que vous gérerez ensuite les personnes, le matériel et l'inventaire.
+  </p>
+
+  {% if erreur %}<p class="banner err">✕ {{ erreur }}</p>{% endif %}
+
+  <form method="post" action="/setup" class="form">
+    <label>
+      <span>Nom complet</span>
+      <input type="text" name="nom" value="{{ nom or '' }}" autofocus required
+             placeholder="Prénom Nom">
+    </label>
+    <label>
+      <span>Identifiant de connexion</span>
+      <input type="text" name="username" value="{{ username or '' }}" required
+             placeholder="pnom">
+    </label>
+    <label>
+      <span>Code (4 chiffres minimum)</span>
+      <input type="password" name="pin" inputmode="numeric" pattern="[0-9]*" required>
+    </label>
+    <label>
+      <span>Répéter le code</span>
+      <input type="password" name="pin2" inputmode="numeric" pattern="[0-9]*" required>
+    </label>
+    <button type="submit" class="primary large">Créer le compte</button>
+  </form>
+
+  <p class="hint">
+    Conseil : pour un compte administrateur, un code plus long que quatre
+    chiffres est nettement plus sûr. Au kiosque, quatre chiffres suffisent.
+  </p>
+</main>
+
+</body>
+</html>

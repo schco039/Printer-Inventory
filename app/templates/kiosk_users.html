@@ -1,0 +1,21 @@
+{% extends "kiosk_base.html" %}
+{% block heading %}Qui êtes-vous ?{% endblock %}
+
+{% block content %}
+
+{% if users %}
+<div class="k-tiles k-people-tiles">
+  {% for u in users %}
+  <a class="k-tile" href="/kiosk/code/{{ u.id }}">
+    <span class="k-tile-name">{{ u.nom }}</span>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<p class="k-empty">
+  Aucune personne n'a encore de code.<br>
+  L'administrateur doit en créer dans « Utilisateurs ».
+</p>
+{% endif %}
+
+{% endblock %}

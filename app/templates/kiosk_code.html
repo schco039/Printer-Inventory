@@ -1,0 +1,91 @@
+{% extends "kiosk_base.html" %}
+
+{% block back %}<a class="k-back" href="/kiosk">‹ Retour</a>{% endblock %}
+{% block heading %}{{ cible.nom }}{% endblock %}
+
+{% block content %}
+
+{% if erreur %}<p class="k-error">{{ erreur }}</p>{% endif %}
+
+<form method="post" class="k-form k-pin-form" id="pinform">
+  <p class="k-badge-text">Entrez votre code</p>
+
+  <div class="k-pin-display" id="affichage">
+    <span class="k-pin-dot"></span>
+    <span class="k-pin-dot"></span>
+    <span class="k-pin-dot"></span>
+    <span class="k-pin-dot"></span>
+  </div>
+  <input type="hidden" name="pin" id="pin" value="">
+
+  <div class="k-pad">
+    {% for chiffre in ['1','2','3','4','5','6','7','8','9'] %}
+    <button type="button" class="k-key" data-key="{{ chiffre }}">{{ chiffre }}</button>
+    {% endfor %}
+    <button type="button" class="k-key k-key-wide" id="effacer">←</button>
+    <button type="button" class="k-key" data-key="0">0</button>
+    <button type="submit" class="k-key k-key-ok" id="valider">OK</button>
+  </div>
+</form>
+
+{% endblock %}
+
+{% block script %}
+<script>
+(function () {
+  var champ = document.getElementById('pin');
+  var affichage = document.getElementById('affichage');
+  var formular = document.getElementById('pinform');
+  var LONGUEUR_AUTO = 4;      // vierstellige Codes werden von selbst abgeschickt
+  var MAX = 12;
+
+  function dessiner() {
+    var n = champ.value.length;
+    var points = affichage.children;
+    // Anzeige wächst mit, falls jemand einen längeren Code hat
+    while (points.length < Math.max(LONGUEUR_AUTO, n)) {
+      var s = document.createElement('span');
+      s.className = 'k-pin-dot';
+      affichage.appendChild(s);
+      points = affichage.children;
+    }
+    for (var i = 0; i < points.length; i++) {
+      points[i].className = 'k-pin-dot' + (i < n ? ' on' : '');
+    }
+  }
+
+  function ajouter(chiffre) {
+    if (champ.value.length >= MAX) { return; }
+    champ.value += chiffre;
+    dessiner();
+    if (champ.value.length === LONGUEUR_AUTO) {
+      setTimeout(function () { formular.submit(); }, 120);
+    }
+  }
+
+  var touches = document.querySelectorAll('[data-key]');
+  for (var i = 0; i < touches.length; i++) {
+    (function (t) {
+      t.addEventListener('click', function () { ajouter(t.getAttribute('data-key')); });
+    })(touches[i]);
+  }
+
+  document.getElementById('effacer').addEventListener('click', function () {
+    champ.value = champ.value.slice(0, -1);
+    dessiner();
+  });
+
+  // Zahlenblock einer angeschlossenen Tastatur funktioniert ebenfalls
+  document.addEventListener('keydown', function (e) {
+    if (e.key >= '0' && e.key <= '9') { ajouter(e.key); }
+    else if (e.key === 'Backspace') {
+      e.preventDefault();
+      champ.value = champ.value.slice(0, -1);
+      dessiner();
+    }
+  });
+
+  dessiner();
+})();
+</script>
+{% endblock %}

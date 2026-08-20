@@ -43,16 +43,15 @@
 
       <a href="/admin/utilisateurs" class="{{ 'on' if nav == 'users' }}">Utilisateurs</a>
     </nav>
-    <a class="kiosk-link" href="/kiosk" target="_blank" rel="noopener">Kiosque ↗</a>
+    <span class="topbar-right">
+      {% if utilisateur %}
+      <span class="qui">{{ utilisateur.nom }}</span>
+      <a class="kiosk-link" href="/logout">Se déconnecter</a>
+      {% endif %}
+      <a class="kiosk-link" href="/kiosk" target="_blank" rel="noopener">Kiosque ↗</a>
+    </span>
   </header>
 
-  {% if not admin_protected() %}
-  <p class="banner warn">
-    ⚠ Aucun mot de passe administrateur n'est configuré — cette interface est
-    accessible à tous. Définissez <code>ADMIN_PASSWORD</code> dans le fichier
-    <code>.env</code>, puis redémarrez.
-  </p>
-  {% endif %}
 
   <main>
     {% block content %}{% endblock %}

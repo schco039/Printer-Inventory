@@ -8,8 +8,10 @@ from datetime import date, datetime
 import pytest
 from sqlalchemy import select
 
+from datetime import timedelta
+
 from app.models import AppUser, Consumable, Delivery, Movement, PrinterModel
-from app.security import badge_hash, normalize_uid
+from app.security import MAX_ECHECS, PinFehler, pin_hashen, pin_stimmt
 from app.services import (
     order_proposals,
     record_movement,
@@ -19,120 +21,130 @@ from app.services import (
 from tests.test_web import configure_cmyk, do_import, export  # noqa: F401
 
 
-# ─────────────────────────── Badges (M4) ─────────────────────────────
+# ─────────────────────────── PIN und Anmeldung ───────────────────────
 
 
-def test_uid_normalisierung():
-    assert normalize_uid("04:a2:1b") == normalize_uid("04A21B") == "04A21B"
-    assert normalize_uid(" 04-a2-1b ") == "04A21B"
-    assert normalize_uid("") == ""
+def test_pin_wird_gehasht_und_nicht_im_klartext_gehalten():
+    h = pin_hashen("1234")
+    assert h.startswith("pbkdf2_sha256$")
+    assert "1234" not in h
+    assert pin_stimmt("1234", h)
+    assert not pin_stimmt("1235", h)
+    # zweimal derselbe PIN ergibt wegen des Salzes verschiedene Hashes
+    assert pin_hashen("1234") != h
 
 
-def test_badge_hash_ist_stabil_und_kein_klartext():
-    h = badge_hash("04:A2:1B")
-    assert h == badge_hash("04a21b")            # gleiche Karte, andere Schreibweise
-    assert h != badge_hash("04A21C")            # andere Karte
-    assert len(h) == 64
-    assert "04A21B" not in h                    # UID nicht rekonstruierbar
-    assert badge_hash("") == ""
+def test_pin_format_wird_geprueft():
+    for schlecht in ("123", "abcd", "12a4", ""):
+        with pytest.raises(PinFehler):
+            pin_hashen(schlecht)
+    assert pin_hashen("123456")     # längere Codes sind erlaubt
 
 
-def test_badge_anlernen_speichert_nur_den_hash(client, db):
+def test_anmeldung_im_web(anon):
+    r = anon.post("/login", data={"username": "cschumacher", "pin": "1234"},
+                  follow_redirects=False)
+    assert r.status_code == 303
+    assert anon.get("/admin").status_code == 200
+
+
+def test_falscher_pin_im_web(anon):
+    r = anon.post("/login", data={"username": "cschumacher", "pin": "9999"})
+    assert r.status_code == 401
+    assert "Code incorrect" in r.text
+
+
+def test_admin_bereich_ohne_anmeldung_leitet_um(anon):
+    r = anon.get("/admin", follow_redirects=False)
+    assert r.status_code == 303
+    assert "/login" in r.headers["location"]
+
+
+def test_normale_person_kommt_nicht_in_die_verwaltung(anon):
+    anon.post("/login", data={"username": "pmuller", "pin": "5678"},
+              follow_redirects=False)
+    assert anon.get("/admin").status_code == 403
+
+
+def test_abmelden(client):
+    client.get("/logout", follow_redirects=False)
+    assert client.get("/admin", follow_redirects=False).status_code == 303
+
+
+def test_sperre_nach_mehreren_fehlversuchen(anon, db):
+    for _ in range(MAX_ECHECS):
+        anon.post("/login", data={"username": "pmuller", "pin": "0000"})
+
+    db.expire_all()
+    paul = db.scalar(select(AppUser).where(AppUser.username == "pmuller"))
+    assert paul.bloque_jusqua is not None
+
+    # Auch der richtige PIN wird während der Sperre abgelehnt
+    r = anon.post("/login", data={"username": "pmuller", "pin": "5678"})
+    assert r.status_code == 401
+    assert "bloqué" in r.text
+
+
+def test_erfolgreiche_anmeldung_setzt_den_zaehler_zurueck(anon, db):
+    anon.post("/login", data={"username": "pmuller", "pin": "0000"})
+    anon.post("/login", data={"username": "pmuller", "pin": "5678"},
+              follow_redirects=False)
+    db.expire_all()
+    assert db.scalar(select(AppUser).where(AppUser.username == "pmuller")).echecs == 0
+
+
+def test_admin_kann_entsperren(client, db):
+    paul = db.scalar(select(AppUser).where(AppUser.username == "pmuller"))
+    paul.bloque_jusqua = datetime.now() + timedelta(minutes=5)
+    db.commit()
+
+    client.post(f"/admin/utilisateurs/{paul.id}/debloquer", follow_redirects=True)
+    db.expire_all()
+    assert db.get(AppUser, paul.id).bloque_jusqua is None
+
+
+def test_neue_person_bekommt_einen_code_angezeigt(client, db):
+    r = client.post("/admin/utilisateurs",
+                    data={"user_id": 0, "nom": "Anne Weber", "role": "user"},
+                    follow_redirects=True)
+    assert "Code de Anne Weber" in r.text
+
+    anne = db.scalar(select(AppUser).where(AppUser.nom == "Anne Weber"))
+    assert anne.username == "aweber"        # automatisch abgeleitet
+    assert anne.pin_defini
+
+
+def test_benutzername_kollision_wird_hochgezaehlt(client, db):
     client.post("/admin/utilisateurs", data={"user_id": 0, "nom": "Paul Muller"},
                 follow_redirects=True)
-    user = db.scalar(select(AppUser))
+    namen = [u.username for u in db.scalars(select(AppUser)).all()]
+    assert "pmuller" in namen and "pmuller2" in namen
 
-    client.post(f"/admin/utilisateurs/{user.id}/badge",
-                data={"type": "mycard", "uid": "04:A2:1B"}, follow_redirects=True)
+
+def test_admin_setzt_einen_bestimmten_code(client, db):
+    paul = db.scalar(select(AppUser).where(AppUser.username == "pmuller"))
+    client.post(f"/admin/utilisateurs/{paul.id}/code", data={"pin": "4321"},
+                follow_redirects=True)
     db.expire_all()
-    user = db.get(AppUser, user.id)
-
-    assert user.mycard_hash == badge_hash("04A21B")
-    assert user.salto_hash is None
-    # Die rohe UID darf nirgends in der Datenbank stehen
-    assert "04A21B" not in str(user.__dict__)
+    assert pin_stimmt("4321", db.get(AppUser, paul.id).pin_hash)
 
 
-def test_beide_badges_pro_person(client, db):
-    client.post("/admin/utilisateurs", data={"user_id": 0, "nom": "Anne Weber"},
-                follow_redirects=True)
-    user = db.scalar(select(AppUser))
-    client.post(f"/admin/utilisateurs/{user.id}/badge",
-                data={"type": "mycard", "uid": "AAAA1111"}, follow_redirects=True)
-    client.post(f"/admin/utilisateurs/{user.id}/badge",
-                data={"type": "salto", "uid": "BBBB2222"}, follow_redirects=True)
+def test_ersteinrichtung_nur_ohne_administrator(anon, db):
+    # Es gibt bereits einen Administrator
+    assert anon.get("/setup", follow_redirects=False).status_code == 303
+
+    for u in db.scalars(select(AppUser)).all():
+        u.role = "user"
+    db.commit()
+
+    assert anon.get("/setup").status_code == 200
+    r = anon.post("/setup", data={"nom": "Chef", "username": "chef",
+                                  "pin": "246810", "pin2": "246810"},
+                  follow_redirects=False)
+    assert r.status_code == 303
     db.expire_all()
-    user = db.get(AppUser, user.id)
-    assert user.mycard_hash and user.salto_hash
-    assert user.mycard_hash != user.salto_hash
-
-
-def test_badge_kann_nicht_zwei_personen_gehoeren(client, db):
-    for nom in ("Paul", "Anne"):
-        client.post("/admin/utilisateurs", data={"user_id": 0, "nom": nom}, follow_redirects=True)
-    paul, anne = db.scalars(select(AppUser).order_by(AppUser.id)).all()
-
-    client.post(f"/admin/utilisateurs/{paul.id}/badge",
-                data={"type": "mycard", "uid": "CAFE1234"}, follow_redirects=True)
-    r = client.post(f"/admin/utilisateurs/{anne.id}/badge",
-                    data={"type": "mycard", "uid": "CAFE1234"}, follow_redirects=True)
-
-    assert "déjà attribué" in r.text
-    db.expire_all()
-    assert db.get(AppUser, anne.id).mycard_hash is None
-
-
-def test_kiosk_bucht_per_badge(client, db, export):
-    do_import(client, export)
-    configure_cmyk(client, db)
-    noir = db.scalar(select(Consumable).where(Consumable.sku == "TN-423BK"))
-    client.post("/admin/inventaire",
-                data={"date_comptage": "2026-09-01", "consumable_id": [noir.id], "compte": ["5"]},
-                follow_redirects=True)
-    client.post("/admin/utilisateurs", data={"user_id": 0, "nom": "Paul Muller"},
-                follow_redirects=True)
-    user = db.scalar(select(AppUser))
-    client.post(f"/admin/utilisateurs/{user.id}/badge",
-                data={"type": "salto", "uid": "DEAD-BEEF"}, follow_redirects=True)
-
-    r = client.post("/kiosk/retrait",
-                    data={"consumable_id": noir.id, "quantite": 1, "badge": "dead:beef"})
-    assert r.status_code == 200
-    assert "Paul Muller" in r.text
-
-    m = db.scalars(select(Movement).where(Movement.motif == "retrait")).first()
-    assert m.user_id == user.id
-    assert m.badge_type == "salto"
-
-
-def test_kiosk_lehnt_unbekannten_badge_ab(client, db, export):
-    do_import(client, export)
-    configure_cmyk(client, db)
-    noir = db.scalar(select(Consumable).where(Consumable.sku == "TN-423BK"))
-    client.post("/admin/inventaire",
-                data={"date_comptage": "2026-09-01", "consumable_id": [noir.id], "compte": ["5"]},
-                follow_redirects=True)
-    client.post("/admin/utilisateurs", data={"user_id": 0, "nom": "Paul"}, follow_redirects=True)
-    user = db.scalar(select(AppUser))
-    client.post(f"/admin/utilisateurs/{user.id}/badge",
-                data={"type": "mycard", "uid": "1111"}, follow_redirects=True)
-
-    r = client.post("/kiosk/retrait",
-                    data={"consumable_id": noir.id, "quantite": 1, "badge": "9999"})
-    assert r.status_code == 403
-    assert "Badge inconnu" in r.text
-    assert db.scalars(select(Movement).where(Movement.motif == "retrait")).first() is None
-
-
-def test_ohne_angelernte_badges_bleibt_die_namensliste(client, db, export):
-    do_import(client, export)
-    configure_cmyk(client, db)
-    noir = db.scalar(select(Consumable).where(Consumable.sku == "TN-423BK"))
-    client.post("/admin/utilisateurs", data={"user_id": 0, "nom": "Paul"}, follow_redirects=True)
-
-    page = client.get(f"/kiosk/retrait/{noir.id}").text
-    assert "Présentez votre badge" not in page
-    assert "Paul" in page
+    chef = db.scalar(select(AppUser).where(AppUser.username == "chef"))
+    assert chef.role == "admin" and chef.pin_defini
 
 
 # ─────────────────────────── Wareneingang (M5) ───────────────────────
@@ -396,16 +408,12 @@ def test_benutzer_lassen_sich_bearbeiten(client, db):
     assert 'value="Paul Muller"' in page
 
 
-def test_badge_feld_ist_sichtbar_kein_passwortfeld(client, db):
-    """type=password verbarg die Eingabe — man sah nicht, ob der Leser sendet."""
-    client.post("/admin/utilisateurs", data={"user_id": 0, "nom": "Anne"},
+def test_benutzer_lassen_sich_bearbeiten_und_kiosk_zeigt_sie(client, db):
+    """Umbenennen wirkt auch auf den Namenskacheln am Kiosk."""
+    paul = db.scalar(select(AppUser).where(AppUser.username == "pmuller"))
+    client.post("/admin/utilisateurs",
+                data={"user_id": paul.id, "nom": "Paul Müller",
+                      "username": "pmuller", "role": "user", "actif": "1"},
                 follow_redirects=True)
-    page = client.get("/admin/utilisateurs").text
-    assert 'name="uid"' in page
-    assert 'type="password" name="uid"' not in page
-
-
-def test_leser_diagnoseseite_erreichbar(client):
-    page = client.get("/admin/badge-test")
-    assert page.status_code == 200
-    assert "UID aléatoire" in page.text
+    db.expire_all()
+    assert db.get(AppUser, paul.id).nom == "Paul Müller"

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Connexion — Consommables LGK</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <link rel="icon" href="data:,">
+</head>
+<body class="centre">
+
+<main class="carte-connexion">
+  <h1>Consommables <span>LGK</span></h1>
+
+  {% if erreur %}<p class="banner err">✕ {{ erreur }}</p>{% endif %}
+
+  <form method="post" action="/login" class="form">
+    <input type="hidden" name="next" value="{{ next }}">
+    <label>
+      <span>Identifiant</span>
+      <input type="text" name="username" value="{{ username or '' }}"
+             autocomplete="username" autofocus required>
+    </label>
+    <label>
+      <span>Code</span>
+      <input type="password" name="pin" inputmode="numeric" autocomplete="current-password"
+             pattern="[0-9]*" required>
+    </label>
+    <button type="submit" class="primary large">Se connecter</button>
+  </form>
+
+  <p class="hint">
+    Même code qu'au kiosque. Code oublié ? Un administrateur peut en attribuer
+    un nouveau.
+  </p>
+</main>
+
+</body>
+</html>

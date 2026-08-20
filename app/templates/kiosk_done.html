@@ -10,9 +10,10 @@
     <span class="k-delta {{ 'neg' if delta < 0 else 'pos' }}">{{ '+' if delta > 0 }}{{ delta }}</span>
   </p>
   <p class="k-done-stock">Stock : <strong>{{ reste }}</strong></p>
-  {% if user %}<p class="k-done-user">{{ user.nom }}</p>{% endif %}
-  <p class="k-done-back">Retour à l'accueil dans <span id="cd">4</span> s</p>
-  <a class="k-confirm" href="/kiosk">Terminer</a>
+  <p class="k-done-user">{{ utilisateur.nom }}</p>
+  <p class="k-done-back">Retour au catalogue dans <span id="cd">4</span> s</p>
+  <a class="k-confirm" href="/kiosk/catalogue">Continuer</a>
+  <p class="k-done-back"><a class="k-back" href="/kiosk/fin">Terminer et déconnecter</a></p>
 </div>
 
 {% endblock %}
@@ -25,7 +26,7 @@
     setInterval(function () {
       n -= 1;
       if (el) { el.textContent = n > 0 ? n : 0; }
-      if (n <= 0) { window.location.href = '/kiosk'; }
+      if (n <= 0) { window.location.href = '/kiosk/catalogue'; }
     }, 1000);
   })();
 </script>

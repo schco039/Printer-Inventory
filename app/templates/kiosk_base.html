@@ -12,6 +12,9 @@
   <header class="k-top">
     {% block back %}<span class="k-back-placeholder"></span>{% endblock %}
     <h1>{% block heading %}Consommables{% endblock %}</h1>
+    {% if utilisateur %}
+    <a class="k-user" href="/kiosk/fin">{{ utilisateur.nom }} · Terminer</a>
+    {% endif %}
     <span class="k-clock" id="clock"></span>
   </header>
 
@@ -35,8 +38,10 @@
     // Bewusst kein Framework: läuft auch auf altem Chromium.
     (function () {
       var seconds = {{ idle_reset }};
-      var home = '/kiosk';
-      if (!seconds || window.location.pathname === home) { return; }
+      // Nach Untätigkeit abmelden, nicht nur zurückspringen: das Gerät steht
+      // öffentlich, die nächste Person soll sich neu ausweisen müssen.
+      var home = {{ 'true' if utilisateur else 'false' }} ? '/kiosk/fin' : '/kiosk';
+      if (!seconds || window.location.pathname === '/kiosk') { return; }
       var timer = null;
       function reset() {
         if (timer) { clearTimeout(timer); }

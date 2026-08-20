@@ -19,13 +19,15 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.sessions import SessionMiddleware
 
+from app.auth import Umleitung, umleitung_handler
 from app.backup import start_scheduler
 from app.config import get_settings
 from app.db import SessionLocal, seed_settings
 from app.deps import BASE_DIR
 from app.routers import (
-    badge_api,
+    auth_routes,
     consumables,
     deliveries,
     imports,
@@ -60,8 +62,22 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Signiertes Sitzungscookie. Ohne gesetztes APP_SECRET wäre es fälschbar —
+# install.sh erzeugt den Wert automatisch.
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.app_secret,
+    session_cookie="lgk_session",
+    same_site="lax",
+    https_only=False,
+    max_age=None,
+)
+
+app.add_exception_handler(Umleitung, umleitung_handler)
+
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
+app.include_router(auth_routes.router)
 app.include_router(printers.router)
 app.include_router(imports.router)
 app.include_router(consumables.router)
@@ -70,7 +86,6 @@ app.include_router(deliveries.router)
 app.include_router(reports.router)
 app.include_router(users.router)
 app.include_router(kiosk.router)
-app.include_router(badge_api.router)
 
 
 @app.get("/healthz", include_in_schema=False)

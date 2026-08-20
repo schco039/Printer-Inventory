@@ -66,7 +66,6 @@
         <td>{{ motif_label.get(m.motif, m.motif) }}</td>
         <td>
           {{ users[m.user_id].nom if m.user_id and m.user_id in users else '—' }}
-          {% if m.badge_type %}<span class="tag grey">{{ m.badge_type }}</span>{% endif %}
         </td>
         <td class="hint">{{ m.note or '' }}</td>
         <td class="mono">{{ m.annee_scolaire }}</td>

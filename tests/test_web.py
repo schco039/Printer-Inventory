@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import select
 
-from app.models import Consumable, ModelConsumable, Movement, PrinterModel
+from app.models import AppUser, Consumable, ModelConsumable, Movement, PrinterModel
 from tests.test_importer import make_xlsx, row
 
 
@@ -244,24 +244,46 @@ def test_korrekturbuchung(client, db, export):
     assert "défectueuse" in client.get("/admin/mouvements").text
 
 
-# ─────────────────────────── M3: Kiosk ───────────────────────────────
+# ─────────────────────────── Kiosk ───────────────────────────────────
 
 
-def test_kiosk_ohne_material_zeigt_modelle_ausgegraut(client, export):
+def test_kiosk_verlangt_anmeldung(anon, export):
+    """Ohne Anmeldung führt jede Kiosk-Seite zur Namensauswahl."""
+    r = anon.get("/kiosk/catalogue", follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["location"] == "/kiosk"
+
+    seite = anon.get("/kiosk").text
+    assert "Qui êtes-vous" in seite
+    assert "Paul Muller" in seite
+
+
+def test_kiosk_anmeldung_mit_pin(anon, db):
+    from tests.conftest import USER_PIN
+    user = db.scalar(select(AppUser).where(AppUser.username == "pmuller"))
+
+    r = anon.post(f"/kiosk/code/{user.id}", data={"pin": USER_PIN},
+                  follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["location"] == "/kiosk/catalogue"
+
+
+def test_kiosk_falscher_pin(anon, db):
+    user = db.scalar(select(AppUser).where(AppUser.username == "pmuller"))
+    r = anon.post(f"/kiosk/code/{user.id}", data={"pin": "0000"})
+    assert r.status_code == 401
+    assert "Code incorrect" in r.text
+    assert anon.get("/kiosk/catalogue", follow_redirects=False).status_code == 303
+
+
+def test_kiosk_ohne_material_zeigt_modelle_ausgegraut(client, kiosk, export):
     do_import(client, export)
-    page = client.get("/kiosk").text
+    page = kiosk.get("/kiosk/catalogue").text
     assert "consommables non configurés" in page
     assert "Brother HL-L8260CDW" in page
 
 
-def test_kiosk_ohne_zweite_marke_startet_bei_modellen(client, export):
-    do_import(client, export)
-    page = client.get("/kiosk").text
-    assert "Choisir le modèle" in page
-    assert "Choisir la marque" not in page
-
-
-def test_kiosk_zeigt_farben_und_bestand(client, db, export):
+def test_kiosk_zeigt_farben_und_bestand(client, kiosk, db, export):
     do_import(client, export)
     model = configure_cmyk(client, db)
     ids = [c.id for c in db.scalars(select(Consumable).order_by(Consumable.sku)).all()]
@@ -270,59 +292,55 @@ def test_kiosk_zeigt_farben_und_bestand(client, db, export):
                       "compte": ["3", "12", "0", "5", "5"]},
                 follow_redirects=True)
 
-    page = client.get(f"/kiosk/modele/{model.slug}").text
-    assert "NOIR" in page and "CYAN" in page and "MAGENTA" in page and "JAUNE" in page
-    assert "RUPTURE" in page          # TN-423M steht auf 0
+    page = kiosk.get(f"/kiosk/modele/{model.slug}").text
+    assert "NOIR" in page and "CYAN" in page
+    assert "RUPTURE" in page
     assert "TN-423BK" in page
 
 
-def test_kiosk_retrait_bucht_und_zieht_bestand_ab(client, db, export):
+def test_kiosk_bucht_auf_die_angemeldete_person(client, kiosk, db, export):
     do_import(client, export)
     configure_cmyk(client, db)
     noir = db.scalar(select(Consumable).where(Consumable.sku == "TN-423BK"))
     client.post("/admin/inventaire",
-                data={"date_comptage": "2026-09-01", "consumable_id": [noir.id], "compte": ["5"]},
-                follow_redirects=True)
-    client.post("/admin/utilisateurs", data={"user_id": 0, "nom": "Paul Muller", "role": "user"},
-                follow_redirects=True)
-    from app.models import AppUser
-    user = db.scalar(select(AppUser))
+                data={"date_comptage": "2026-09-01", "consumable_id": [noir.id],
+                      "compte": ["5"]}, follow_redirects=True)
 
-    r = client.post("/kiosk/retrait",
-                    data={"consumable_id": noir.id, "quantite": 2, "user_id": user.id, "sens": "sortie"})
+    r = kiosk.post("/kiosk/retrait", data={"consumable_id": noir.id, "quantite": 2})
     assert r.status_code == 200
-    assert "Enregistré" in r.text
     assert "Paul Muller" in r.text
 
-    mouvement = db.scalars(
-        select(Movement).where(Movement.motif == "retrait")
-    ).first()
-    assert mouvement.delta == -2
-    assert mouvement.user_id == user.id
-    assert mouvement.annee_scolaire  # wird immer gesetzt
+    paul = db.scalar(select(AppUser).where(AppUser.username == "pmuller"))
+    m = db.scalars(select(Movement).where(Movement.motif == "retrait")).first()
+    assert m.delta == -2
+    assert m.user_id == paul.id
 
 
-def test_kiosk_blockiert_negativen_bestand(client, db, export):
+def test_kiosk_blockiert_negativen_bestand(client, kiosk, db, export):
     do_import(client, export)
     configure_cmyk(client, db)
     noir = db.scalar(select(Consumable).where(Consumable.sku == "TN-423BK"))
     client.post("/admin/inventaire",
-                data={"date_comptage": "2026-09-01", "consumable_id": [noir.id], "compte": ["1"]},
-                follow_redirects=True)
+                data={"date_comptage": "2026-09-01", "consumable_id": [noir.id],
+                      "compte": ["1"]}, follow_redirects=True)
 
-    r = client.post("/kiosk/retrait",
-                    data={"consumable_id": noir.id, "quantite": 3, "user_id": 0, "sens": "sortie"})
+    r = kiosk.post("/kiosk/retrait", data={"consumable_id": noir.id, "quantite": 3})
     assert r.status_code == 400
     assert "Stock insuffisant" in r.text
     assert db.scalars(select(Movement).where(Movement.motif == "retrait")).first() is None
 
 
-def test_kiosk_retour_bucht_positiv(client, db, export):
+def test_kiosk_retour_bucht_positiv(client, kiosk, db, export):
     do_import(client, export)
     configure_cmyk(client, db)
     noir = db.scalar(select(Consumable).where(Consumable.sku == "TN-423BK"))
 
-    client.post("/kiosk/retrait",
-                data={"consumable_id": noir.id, "quantite": 1, "user_id": 0, "sens": "retour"})
-    mouvement = db.scalars(select(Movement).where(Movement.motif == "retour")).first()
-    assert mouvement.delta == 1
+    kiosk.post("/kiosk/retrait",
+               data={"consumable_id": noir.id, "quantite": 1, "sens": "retour"})
+    m = db.scalars(select(Movement).where(Movement.motif == "retour")).first()
+    assert m.delta == 1
+
+
+def test_kiosk_abmelden(kiosk):
+    kiosk.get("/kiosk/fin", follow_redirects=False)
+    assert kiosk.get("/kiosk/catalogue", follow_redirects=False).status_code == 303

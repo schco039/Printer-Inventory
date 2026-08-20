@@ -26,33 +26,7 @@
     </div>
   </div>
 
-  <div class="k-who">
-    {% if badge_mode %}
-    <span class="k-label">Qui ?</span>
-    <div class="k-badge">
-      <div class="k-badge-icon">▮▮▮</div>
-      <p class="k-badge-text">Présentez votre badge sur le lecteur</p>
-      <input type="text" name="badge" id="badge" autocomplete="off"
-             autofocus inputmode="none" class="k-badge-input">
-      <input type="hidden" name="ticket" id="ticket" value="">
-      <p class="k-hint" id="badge-etat">myCard ou Salto — les deux fonctionnent.</p>
-    </div>
-    {% elif users %}
-    <span class="k-label">Qui ?</span>
-    <div class="k-people">
-      {% for u in users %}
-      <label class="k-person">
-        <input type="radio" name="user_id" value="{{ u.id }}" {{ 'checked' if loop.first }}>
-        <span>{{ u.nom }}</span>
-      </label>
-      {% endfor %}
-    </div>
-    <p class="k-hint">Aucun badge enregistré : la personne se choisit dans la liste.</p>
-    {% else %}
-    <input type="hidden" name="user_id" value="0">
-    <p class="k-hint">Aucune personne enregistrée — le mouvement sera anonyme.</p>
-    {% endif %}
-  </div>
+  <p class="k-hint">Au nom de <strong>{{ utilisateur.nom }}</strong></p>
 
   <button type="submit" class="k-confirm">
     {{ 'Confirmer le retour' if sens == 'retour' else 'Confirmer le retrait' }}
@@ -70,48 +44,5 @@
     if (v > 99) { v = 99; }
     input.value = v;
   }
-
-  // Zwei Arten von Lesern werden unterstützt:
-  //  - Tastatur-Leser tippen die UID direkt ins Feld (bleibt fokussiert)
-  //  - PC/SC-Leser (z. B. Gemalto Prox-SU) melden über den Lesedienst;
-  //    diese Seite fragt dann kurz zyklisch nach
-  (function () {
-    var badge = document.getElementById('badge');
-    if (!badge) { return; }
-    function focusBadge() { try { badge.focus(); } catch (e) {} }
-    focusBadge();
-    setInterval(focusBadge, 800);
-    document.addEventListener('click', focusBadge, true);
-
-    var ticket = document.getElementById('ticket');
-    var etat = document.getElementById('badge-etat');
-    var formular = badge.form;
-    var station = (function () {
-      var m = window.location.search.match(/[?&]station=([^&]+)/);
-      return m ? decodeURIComponent(m[1]) : 'default';
-    })();
-    var laeuft = false;
-
-    setInterval(function () {
-      if (laeuft) { return; }
-      laeuft = true;
-      var x = new XMLHttpRequest();
-      x.open('GET', '/api/badge/pending?station=' + encodeURIComponent(station), true);
-      x.onreadystatechange = function () {
-        if (x.readyState !== 4) { return; }
-        laeuft = false;
-        if (x.status !== 200) { return; }
-        try {
-          var r = JSON.parse(x.responseText);
-          if (r.ready && r.ticket) {
-            ticket.value = r.ticket;
-            if (etat && r.nom) { etat.textContent = r.nom; }
-            formular.submit();
-          }
-        } catch (e) {}
-      };
-      x.send();
-    }, 700);
-  })();
 </script>
 {% endblock %}

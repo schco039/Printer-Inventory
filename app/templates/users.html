@@ -5,27 +5,37 @@
 <h1>Utilisateurs <span class="count">{{ users|length }}</span></h1>
 
 {% if erreur %}<p class="banner err">✕ {{ erreur }}</p>{% endif %}
+{% if message %}<p class="banner ok">✓ {{ message }}</p>{% endif %}
+
+{% if nouveau_code %}
+<section class="panel code-nouveau">
+  <h2>Code de {{ nouveau_nom }}</h2>
+  <p class="code-grand">{{ nouveau_code }}</p>
+  <p>
+    Notez-le et transmettez-le à la personne. Il n'est affiché
+    <strong>qu'une seule fois</strong> — ensuite, seul son empreinte est conservée.
+  </p>
+</section>
+{% endif %}
 
 <p class="hint">
-  Chaque personne peut avoir deux badges : myCard <strong>et</strong> Salto.
-  Seule une empreinte (HMAC-SHA256) est enregistrée — jamais le numéro de la carte.
-  Le lecteur ne réagit pas ? → <a href="/admin/badge-test">tester le lecteur</a>
+  Le même code sert au kiosque (nom + code) et sur cette interface
+  (identifiant + code). Après {{ max_echecs }} essais incorrects, le compte se
+  bloque quelques minutes — c'est la vraie protection d'un code à
+  {{ pin_min }} chiffres.
 </p>
-
-{% if not nb_badges and users %}
-<p class="banner warn">
-  Aucun badge enregistré : le kiosque affiche encore la liste des noms.
-  Dès qu'un badge est enregistré, il passe automatiquement en mode badge.
-</p>
-{% endif %}
 
 <section class="panel">
   <h2>Ajouter une personne</h2>
   <form method="post" class="inline-form">
     <input type="hidden" name="user_id" value="0">
     <label class="grow">
-      <span>Nom</span>
+      <span>Nom complet</span>
       <input type="text" name="nom" required placeholder="Prénom Nom">
+    </label>
+    <label>
+      <span>Identifiant (facultatif)</span>
+      <input type="text" name="username" placeholder="généré automatiquement">
     </label>
     <label>
       <span>Rôle</span>
@@ -34,133 +44,103 @@
         <option value="admin">Administrateur</option>
       </select>
     </label>
-    <button type="submit" class="primary">Ajouter</button>
+    <button type="submit" class="primary">Ajouter et générer un code</button>
   </form>
 </section>
 
-{% for u in users %}
-<section class="panel {{ 'is-inactive' if not u.actif }}">
-
-  <form method="post" class="inline-form user-head">
-    <input type="hidden" name="user_id" value="{{ u.id }}">
-    <label class="grow">
-      <span>Nom</span>
-      <input type="text" name="nom" value="{{ u.nom }}" required>
-    </label>
-    <label>
-      <span>Rôle</span>
-      <select name="role">
-        <option value="user" {{ 'selected' if u.role != 'admin' }}>Utilisateur</option>
-        <option value="admin" {{ 'selected' if u.role == 'admin' }}>Administrateur</option>
-      </select>
-    </label>
-    <label>
-      <span>État</span>
-      <select name="actif">
-        <option value="1" {{ 'selected' if u.actif }}>Actif</option>
-        <option value="0" {{ 'selected' if not u.actif }}>Inactif</option>
-      </select>
-    </label>
-    <button type="submit">Enregistrer</button>
-    <span class="hint">{{ counts.get(u.id, 0) }} mouvement(s)</span>
-  </form>
-
-  <table class="badges">
-    {% for type, label in [('mycard', 'myCard'), ('salto', 'Salto')] %}
-    {% set enregistre = u.mycard_hash if type == 'mycard' else u.salto_hash %}
-    <tr>
-      <td class="badge-name">{{ '●' if enregistre else '○' }} {{ label }}</td>
-      <td>
-        {% if enregistre %}
-        <span class="tag green">enregistré</span>
-        {% else %}
-        <span class="hint">non enregistré</span>
-        {% endif %}
-      </td>
-      <td>
-        <form method="post" action="/admin/utilisateurs/{{ u.id }}/badge"
-              class="inline-form badge-form" data-badge-form>
-          <input type="hidden" name="type" value="{{ type }}">
-          <input type="hidden" name="ticket" value="">
-          <input type="text" name="uid" autocomplete="off" spellcheck="false"
-                 placeholder="lecteur clavier : cliquez puis présentez la carte"
-                 class="badge-input mono">
-          <button type="button" class="lire">Lire la carte</button>
-          <button type="submit">{{ 'Remplacer' if enregistre else 'Enregistrer' }}</button>
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Nom</th><th>Identifiant</th><th>Rôle</th><th>État</th>
+        <th>Code</th><th class="r">Mouvements</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in users %}
+      <tr class="{{ 'is-absent' if not u.actif }}">
+        <form method="post" id="u{{ u.id }}">
+          <input type="hidden" name="user_id" value="{{ u.id }}">
         </form>
-      </td>
-      <td>
-        {% if enregistre %}
-        <form method="post" action="/admin/utilisateurs/{{ u.id }}/badge/supprimer">
-          <input type="hidden" name="type" value="{{ type }}">
-          <button type="submit" class="link-btn">Supprimer</button>
-        </form>
-        {% endif %}
-      </td>
-    </tr>
-    {% endfor %}
+        <td><input form="u{{ u.id }}" type="text" name="nom" value="{{ u.nom }}" required></td>
+        <td><input form="u{{ u.id }}" type="text" name="username" value="{{ u.username or '' }}" class="mono"></td>
+        <td>
+          <select form="u{{ u.id }}" name="role">
+            <option value="user" {{ 'selected' if u.role != 'admin' }}>Utilisateur</option>
+            <option value="admin" {{ 'selected' if u.role == 'admin' }}>Administrateur</option>
+          </select>
+        </td>
+        <td>
+          <select form="u{{ u.id }}" name="actif">
+            <option value="1" {{ 'selected' if u.actif }}>Actif</option>
+            <option value="0" {{ 'selected' if not u.actif }}>Inactif</option>
+          </select>
+        </td>
+        <td>
+          {% if gesperrt.get(u.id) %}
+            <span class="tag red">bloqué</span>
+          {% elif u.pin_defini %}
+            <span class="tag green">défini</span>
+          {% else %}
+            <span class="tag orange">aucun</span>
+          {% endif %}
+        </td>
+        <td class="r">{{ counts.get(u.id, 0) }}</td>
+        <td class="r nowrap">
+          <button form="u{{ u.id }}" type="submit">Enregistrer</button>
+          <form method="post" action="/admin/utilisateurs/{{ u.id }}/code" class="inline-block">
+            <button type="submit" class="link-btn">Nouveau code</button>
+          </form>
+          {% if gesperrt.get(u.id) %}
+          <form method="post" action="/admin/utilisateurs/{{ u.id }}/debloquer" class="inline-block">
+            <button type="submit" class="link-btn">Débloquer</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
   </table>
-</section>
-{% endfor %}
+</div>
 
 {% if not users %}
-<p class="hint">Aucun utilisateur. Ajoutez au moins une personne pour pouvoir utiliser le kiosque.</p>
+<p class="hint">Aucun utilisateur.</p>
 {% endif %}
+
+<section class="panel">
+  <h2>Choisir soi-même un code</h2>
+  <form method="post" action="/admin/utilisateurs/0/code" class="inline-form" id="codechoisi">
+    <label>
+      <span>Personne</span>
+      <select name="cible" onchange="this.form.action='/admin/utilisateurs/' + this.value + '/code'">
+        {% for u in users %}
+        <option value="{{ u.id }}">{{ u.nom }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      <span>Nouveau code</span>
+      <input type="password" name="pin" inputmode="numeric" pattern="[0-9]*"
+             placeholder="{{ pin_min }} chiffres ou plus">
+    </label>
+    <button type="submit">Définir</button>
+  </form>
+  <p class="hint">
+    Laisser le champ vide génère un code aléatoire. Pour un compte
+    administrateur, un code plus long est recommandé.
+  </p>
+</section>
 
 {% endblock %}
 
 {% block script %}
 <script>
-// "Lire la carte" fragt beim Lesedienst nach (PC/SC-Leser wie Gemalto Prox-SU).
-// Leser im Tastaturmodus tippen stattdessen direkt ins Textfeld.
+// Beim Laden das Ziel des Formulars auf die erste Person setzen
 (function () {
-  var station = (function () {
-    var m = window.location.search.match(/[?&]station=([^&]+)/);
-    return m ? decodeURIComponent(m[1]) : 'default';
-  })();
-
-  var formulare = document.querySelectorAll('[data-badge-form]');
-  for (var i = 0; i < formulare.length; i++) {
-    (function (formular) {
-      var knopf = formular.querySelector('.lire');
-      var ticket = formular.querySelector('input[name=ticket]');
-      var feld = formular.querySelector('input[name=uid]');
-      if (!knopf) { return; }
-
-      knopf.addEventListener('click', function () {
-        var rest = 20;
-        knopf.disabled = true;
-        var urspruenglich = knopf.textContent;
-        feld.placeholder = 'présentez la carte sur le lecteur…';
-
-        var timer = setInterval(function () {
-          rest -= 1;
-          knopf.textContent = 'En attente… ' + rest + ' s';
-          if (rest <= 0) {
-            clearInterval(timer);
-            knopf.disabled = false;
-            knopf.textContent = urspruenglich;
-            feld.placeholder = 'aucune carte lue — le service tourne-t-il ?';
-            return;
-          }
-          var x = new XMLHttpRequest();
-          x.open('GET', '/api/badge/pending?station=' + encodeURIComponent(station), true);
-          x.onreadystatechange = function () {
-            if (x.readyState !== 4 || x.status !== 200) { return; }
-            try {
-              var r = JSON.parse(x.responseText);
-              if (r.ready && r.ticket) {
-                clearInterval(timer);
-                ticket.value = r.ticket;
-                formular.submit();
-              }
-            } catch (e) {}
-          };
-          x.send();
-        }, 800);
-      });
-    })(formulare[i]);
-  }
+  var f = document.getElementById('codechoisi');
+  if (!f) { return; }
+  var s = f.querySelector('select[name=cible]');
+  if (s && s.value) { f.action = '/admin/utilisateurs/' + s.value + '/code'; }
 })();
 </script>
 {% endblock %}

@@ -1,7 +1,7 @@
 {% extends "kiosk_base.html" %}
 
 {% block back %}
-  {% if marque %}<a class="k-back" href="/kiosk">‹ Retour</a>{% else %}<span class="k-back-placeholder"></span>{% endif %}
+  {% if marque %}<a class="k-back" href="/kiosk/catalogue">‹ Retour</a>{% else %}<span class="k-back-placeholder"></span>{% endif %}
 {% endblock %}
 
 {% block heading %}{{ marque or 'Choisir le modèle' }}{% endblock %}

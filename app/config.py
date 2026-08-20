@@ -17,14 +17,6 @@ class Settings(BaseSettings):
     # Secret für Badge-HMAC und Sessions. MUSS in Produktion gesetzt sein.
     app_secret: str = "dev-only-insecure-secret"
 
-    # Basic-Auth für /admin bis M4 (dann echte Benutzerverwaltung).
-    admin_user: str = "admin"
-    admin_password: str = ""
-
-    # Gemeinsames Geheimnis für den Kartenleser-Dienst (tools/badge_agent.py).
-    # Leer = die Schnittstelle /api/badge/scan ist abgeschaltet.
-    badge_agent_token: str = ""
-
     default_locale: str = "fr"
     tz: str = "Europe/Luxembourg"
 

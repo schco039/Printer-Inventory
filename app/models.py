@@ -151,16 +151,31 @@ class ModelConsumable(Base):
 
 
 class AppUser(Base):
+    """Person mit PIN-Anmeldung.
+
+    Am Kiosk wird der Name angetippt und der PIN eingegeben; im Web meldet man
+    sich mit Benutzernamen und demselben PIN an. Der PIN wird nie im Klartext
+    gespeichert (PBKDF2), und nach mehreren Fehlversuchen sperrt das Konto
+    zeitweise — bei vier Ziffern ist das die eigentliche Schutzmaßnahme.
+    """
+
     __tablename__ = "app_user"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     nom: Mapped[str] = mapped_column(String(160), nullable=False)
+    # Anmeldename für das Web; am Kiosk tippt man stattdessen die Namenskachel
+    username: Mapped[str | None] = mapped_column(String(60), unique=True)
     role: Mapped[str] = mapped_column(String(20), nullable=False, default="user")
-    # HMAC-SHA256 der Badge-UID — die rohe UID wird nie gespeichert
-    mycard_hash: Mapped[str | None] = mapped_column(String(64), unique=True)
-    salto_hash: Mapped[str | None] = mapped_column(String(64), unique=True)
     pin_hash: Mapped[str | None] = mapped_column(String(255))
+    pin_change_at: Mapped[datetime | None] = mapped_column(DateTime)
+    # Sperre nach Fehlversuchen
+    echecs: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    bloque_jusqua: Mapped[datetime | None] = mapped_column(DateTime)
     actif: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+
+    @property
+    def pin_defini(self) -> bool:
+        return bool(self.pin_hash)
 
 
 # ─────────────────────────── Bestand ─────────────────────────────────
@@ -199,7 +214,6 @@ class Movement(Base):
     # retrait | reception | retour | inventaire | rebut
     motif: Mapped[str] = mapped_column(String(20), nullable=False)
     user_id: Mapped[int | None] = mapped_column(ForeignKey("app_user.id"))
-    badge_type: Mapped[str | None] = mapped_column(String(10))  # mycard|salto|pin
     printer_id: Mapped[int | None] = mapped_column(ForeignKey("printer.id"))
     delivery_id: Mapped[int | None] = mapped_column(ForeignKey("delivery.id"))
     note: Mapped[str | None] = mapped_column(Text)

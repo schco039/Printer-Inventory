@@ -51,20 +51,6 @@ random_hex() {
   fi
 }
 
-random_password() {
-  # Ohne mehrdeutige Zeichen (0/O, 1/l/I) — wird auf Zettel geschrieben.
-  #
-  # Achtung: 'tr < /dev/urandom | head -c 16' sieht naheliegend aus, bricht
-  # aber unter 'set -o pipefail' ab — head beendet sich zuerst, tr bekommt
-  # SIGPIPE und die Pipeline meldet 141. Deshalb erst eine feste Menge lesen
-  # und danach in der Shell kürzen.
-  local raw=""
-  while [ ${#raw} -lt 16 ]; do
-    raw="${raw}$(head -c 256 /dev/urandom | LC_ALL=C tr -dc 'A-HJ-NP-Za-km-z2-9' || true)"
-  done
-  printf '%s' "${raw:0:16}"
-}
-
 # ── 3. .env anlegen ──────────────────────────────────────────────────
 
 NEW_INSTALL=0
@@ -72,20 +58,12 @@ if [ ! -f .env ]; then
   NEW_INSTALL=1
   info "Erstelle .env mit zufälligen Geheimnissen…"
   APP_SECRET="$(random_hex 32)"
-  ADMIN_PASSWORD="$(random_password)"
-  BADGE_AGENT_TOKEN="$(random_hex 24)"
 
-  sed -e "s|^APP_SECRET=.*|APP_SECRET=${APP_SECRET}|" \
-      -e "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD=${ADMIN_PASSWORD}|" \
-      -e "s|^BADGE_AGENT_TOKEN=.*|BADGE_AGENT_TOKEN=${BADGE_AGENT_TOKEN}|" \
-      .env.example > .env
+  sed -e "s|^APP_SECRET=.*|APP_SECRET=${APP_SECRET}|" .env.example > .env
   chmod 600 .env
   ok ".env erstellt"
 else
   ok ".env vorhanden — wird nicht überschrieben"
-  # '|| true': fehlt die Zeile, liefert grep 1 und pipefail würde abbrechen
-  ADMIN_PASSWORD="$(grep -E '^ADMIN_PASSWORD=' .env | cut -d= -f2- || true)"
-  [ -n "${ADMIN_PASSWORD}" ] || warn "ADMIN_PASSWORD ist leer — die Admin-Oberfläche ist ungeschützt!"
 fi
 
 APP_PORT="$(grep -E '^APP_PORT=' .env | cut -d= -f2- || true)"
@@ -171,17 +149,13 @@ echo "  Admin-Oberfläche   http://${HOST_IP}:${APP_PORT}/admin"
 echo "  Kiosk (RPi)        http://${HOST_IP}:${APP_PORT}/kiosk"
 echo
 if [ "$NEW_INSTALL" -eq 1 ]; then
-  echo "  Benutzer           admin"
-  echo "  Passwort           ${BOLD}${ADMIN_PASSWORD}${OFF}"
-  echo
-  echo "  ${YELLOW}Dieses Passwort steht in der Datei .env und wird hier nur einmal angezeigt.${OFF}"
+  echo "  ${BOLD}Erster Schritt: Administrator anlegen${OFF}"
+  echo "    http://${HOST_IP}:${APP_PORT}/setup"
+  echo "    Dort Name, Anmeldename und Code festlegen. Danach ist die"
+  echo "    Einrichtungsseite gesperrt."
   echo
 fi
-echo "  Nächster Schritt:  Excel-Export unter /admin/import hochladen"
-echo
-echo "  Kartenleser (PC/SC, z. B. Gemalto Prox-SU):"
-echo "    Token steht in .env als BADGE_AGENT_TOKEN"
-echo "    python3 tools/badge_agent.py --server http://${HOST_IP}:${APP_PORT} --token <TOKEN>"
+echo "  Danach:            Excel-Export unter /admin/import hochladen"
 echo
 echo "  Update:            git pull && ./install.sh"
 echo "  Logs:              $COMPOSE logs -f app"

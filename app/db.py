@@ -55,8 +55,8 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "kiosk_brand_level": "auto",
     # Reservefaktor: 1 Satz Material je N Geräte
     "reserve_factor": 10,
-    # Sekunden bis zum automatischen Reset des Kiosk
-    "kiosk_idle_reset_seconds": 45,
+    # Sekunden, die eine Kiosk-Anmeldung ohne Bedienung gültig bleibt
+    "kiosk_session_seconds": 120,
 }
 
 

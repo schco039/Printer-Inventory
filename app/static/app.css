@@ -278,3 +278,40 @@ table.heat td { font-variant-numeric: tabular-nums; }
   border-style: solid !important; border-color: var(--accent) !important;
   outline: none; background: #f7fbff;
 }
+
+
+/* ── Anmeldung, Ersteinrichtung, Codes ──────────────────────────── */
+
+body.centre {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 100vh; padding: 24px;
+}
+.carte-connexion {
+  width: 100%; max-width: 380px;
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 12px; padding: 32px;
+}
+.carte-connexion.large-carte { max-width: 480px; }
+.carte-connexion h1 { font-size: 22px; margin-bottom: 20px; }
+.carte-connexion h1 span { color: var(--accent); }
+.carte-connexion label { display: block; margin-bottom: 16px; }
+.carte-connexion label > span {
+  display: block; margin-bottom: 6px; font-size: 13px; color: var(--muted);
+}
+.carte-connexion input {
+  width: 100%; padding: 11px 12px; border: 1px solid var(--line);
+  border-radius: 6px; font: inherit;
+}
+button.large { width: 100%; padding: 12px; font-size: 15px; }
+
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.qui { color: var(--muted); font-size: 13px; }
+
+.code-nouveau { border-left: 4px solid var(--ok); text-align: center; }
+.code-grand {
+  font-size: 46px; font-weight: 700; letter-spacing: .18em;
+  font-family: ui-monospace, Consolas, monospace; margin: 10px 0;
+}
+.inline-block { display: inline-block; }
+.nowrap { white-space: nowrap; }
+td input[type="text"], td select { min-width: 0; width: 100%; }

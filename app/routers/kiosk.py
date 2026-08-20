@@ -1,33 +1,106 @@
-"""Touch-Kiosk (M3) — Marke ▸ Modell ▸ Farbe ▸ Entnahme.
+"""Touch-Kiosk.
 
-Bis M4 wird die Person aus einer Liste gewählt statt per Badge gescannt.
-Die Buchung selbst ist bereits die endgültige: Badge-Anmeldung wird später
-nur das Auswählen der Person ersetzen.
+Ablauf: Namenskachel antippen, PIN eingeben, dann Modell, Farbe, Menge und
+buchen. Die Anmeldung gilt für eine kurze Zeit, damit mehrere Entnahmen
+hintereinander ohne erneute PIN-Eingabe möglich sind; danach fällt der Kiosk
+von selbst auf die Namensauswahl zurück.
 """
 
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from sqlalchemy import or_
-
+from app.auth import abmelden, aktueller_benutzer, anmelden, require_kiosk
 from app.db import get_session, get_setting
 from app.deps import templates
 from app.models import AppUser, Consumable, Printer, PrinterModel
-from app.badge_bus import einloesen
-from app.security import badge_hash
+from app.security import pruefe_anmeldung
 from app.services import kiosk_groups, record_movement, stock_for
 
 router = APIRouter()
 
 
+def _ctx(session: Session, user: AppUser | None = None, **extra) -> dict:
+    """Gemeinsamer Vorlagen-Kontext. Die angemeldete Person liefert der
+    Kontextprozessor in app/deps.py, hier nur der Rest."""
+    ctx = {"idle_reset": int(get_setting(session, "kiosk_session_seconds") or 120)}
+    ctx.update(extra)
+    return ctx
+
+
+# ─────────────────────────── Anmeldung ───────────────────────────────
+
+
+@router.get("/kiosk", response_class=HTMLResponse)
+def accueil(request: Request, session: Session = Depends(get_session)) -> Response:
+    """Namenskacheln. Wer angemeldet ist, kommt direkt zum Katalog."""
+    if aktueller_benutzer(request, session, art="kiosk") is not None:
+        return RedirectResponse("/kiosk/catalogue", status_code=303)
+
+    users = list(
+        session.scalars(
+            select(AppUser)
+            .where(AppUser.actif == 1, AppUser.pin_hash.is_not(None))
+            .order_by(AppUser.nom)
+        ).all()
+    )
+    return templates.TemplateResponse(
+        request, "kiosk_users.html", _ctx(session, users=users)
+    )
+
+
+@router.get("/kiosk/code/{user_id}", response_class=HTMLResponse)
+def code_form(
+    user_id: int, request: Request, session: Session = Depends(get_session)
+) -> Response:
+    user = session.get(AppUser, user_id)
+    if user is None or not user.actif or not user.pin_hash:
+        return RedirectResponse("/kiosk", status_code=303)
+    return templates.TemplateResponse(
+        request, "kiosk_code.html", _ctx(session, cible=user, erreur=None)
+    )
+
+
+@router.post("/kiosk/code/{user_id}", response_class=HTMLResponse)
+def code_pruefen(
+    user_id: int,
+    request: Request,
+    pin: str = Form(""),
+    session: Session = Depends(get_session),
+) -> Response:
+    user = session.get(AppUser, user_id)
+    if user is None:
+        return RedirectResponse("/kiosk", status_code=303)
+
+    ok, meldung = pruefe_anmeldung(user, pin.strip())
+    session.commit()
+    if not ok:
+        return templates.TemplateResponse(
+            request,
+            "kiosk_code.html",
+            _ctx(session, cible=user, erreur=meldung),
+            status_code=401,
+        )
+
+    anmelden(request, user, "kiosk")
+    return RedirectResponse("/kiosk/catalogue", status_code=303)
+
+
+@router.get("/kiosk/fin")
+def fin(request: Request) -> RedirectResponse:
+    abmelden(request)
+    return RedirectResponse("/kiosk", status_code=303)
+
+
+# ─────────────────────────── Katalog ─────────────────────────────────
+
+
 def _active_models(session: Session) -> list[tuple[PrinterModel, int]]:
-    """Modelle mit aktiven Geräten, häufigste zuerst."""
     rows = session.execute(
-        select(PrinterModel, func.count(Printer.id).label("nb"))
+        select(PrinterModel, func.count(Printer.id))
         .join(Printer, Printer.model_id == PrinterModel.id)
         .where(Printer.etat == "actif")
         .group_by(PrinterModel.id)
@@ -37,7 +110,6 @@ def _active_models(session: Session) -> list[tuple[PrinterModel, int]]:
 
 
 def _brand_level(session: Session, models: list[tuple[PrinterModel, int]]) -> bool:
-    """Markenebene anzeigen? auto = erst ab der zweiten Marke (SPEC 6.1)."""
     mode = get_setting(session, "kiosk_brand_level") or "auto"
     if mode == "always":
         return True
@@ -46,16 +118,13 @@ def _brand_level(session: Session, models: list[tuple[PrinterModel, int]]) -> bo
     return len({model.marque_affichee for model, _ in models}) > 1
 
 
-def _ctx(session: Session, **extra) -> dict:
-    ctx = {"idle_reset": int(get_setting(session, "kiosk_idle_reset_seconds") or 45)}
-    ctx.update(extra)
-    return ctx
-
-
-@router.get("/kiosk", response_class=HTMLResponse)
-def home(request: Request, session: Session = Depends(get_session)) -> HTMLResponse:
+@router.get("/kiosk/catalogue", response_class=HTMLResponse)
+def catalogue(
+    request: Request,
+    session: Session = Depends(get_session),
+    user: AppUser = Depends(require_kiosk),
+) -> HTMLResponse:
     models = _active_models(session)
-
     if _brand_level(session, models):
         marques: dict[str, int] = {}
         for model, nb in models:
@@ -63,86 +132,91 @@ def home(request: Request, session: Session = Depends(get_session)) -> HTMLRespo
         return templates.TemplateResponse(
             request,
             "kiosk_brands.html",
-            _ctx(session, marques=sorted(marques.items())),
+            _ctx(session, user, marques=sorted(marques.items())),
         )
-
     return templates.TemplateResponse(
         request,
         "kiosk_models.html",
-        _ctx(session, models=models, marque=None, mapping=_mapping_state(session, models)),
+        _ctx(
+            session,
+            user,
+            models=models,
+            marque=None,
+            mapping={m.id: bool(m.mapping_ok) for m, _ in models},
+        ),
     )
 
 
 @router.get("/kiosk/marque/{marque}", response_class=HTMLResponse)
-def by_brand(marque: str, request: Request, session: Session = Depends(get_session)) -> HTMLResponse:
-    models = [(m, nb) for m, nb in _active_models(session) if m.marque_affichee == marque]
+def par_marque(
+    marque: str,
+    request: Request,
+    session: Session = Depends(get_session),
+    user: AppUser = Depends(require_kiosk),
+) -> HTMLResponse:
+    models = [
+        (m, nb) for m, nb in _active_models(session) if m.marque_affichee == marque
+    ]
     if not models:
         raise HTTPException(status_code=404, detail="Marque inconnue")
     return templates.TemplateResponse(
         request,
         "kiosk_models.html",
-        _ctx(session, models=models, marque=marque, mapping=_mapping_state(session, models)),
+        _ctx(
+            session,
+            user,
+            models=models,
+            marque=marque,
+            mapping={m.id: bool(m.mapping_ok) for m, _ in models},
+        ),
     )
 
 
 @router.get("/kiosk/modele/{slug}", response_class=HTMLResponse)
-def by_model(slug: str, request: Request, session: Session = Depends(get_session)) -> HTMLResponse:
+def par_modele(
+    slug: str,
+    request: Request,
+    session: Session = Depends(get_session),
+    user: AppUser = Depends(require_kiosk),
+) -> HTMLResponse:
     model = session.scalar(select(PrinterModel).where(PrinterModel.slug == slug))
     if model is None:
         raise HTTPException(status_code=404, detail="Modèle inconnu")
-
-    groups = kiosk_groups(session, model.id)
-    nb = session.scalar(
-        select(func.count())
-        .select_from(Printer)
-        .where(Printer.model_id == model.id, Printer.etat == "actif")
-    ) or 0
-
+    nb = (
+        session.scalar(
+            select(func.count())
+            .select_from(Printer)
+            .where(Printer.model_id == model.id, Printer.etat == "actif")
+        )
+        or 0
+    )
     return templates.TemplateResponse(
         request,
         "kiosk_colors.html",
-        _ctx(session, model=model, groups=groups, nb=nb),
+        _ctx(session, user, model=model, groups=kiosk_groups(session, model.id), nb=nb),
     )
 
 
-def _badge_mode(session: Session) -> bool:
-    """Badge-Modus, sobald mindestens eine Karte angelernt ist (M4).
-
-    Vorher — und wenn kein Badge angelernt ist — bleibt die Namensliste
-    stehen, damit das System auch am ersten Tag benutzbar ist.
-    """
-    return bool(
-        session.scalar(
-            select(AppUser.id)
-            .where(
-                AppUser.actif == 1,
-                or_(AppUser.mycard_hash.is_not(None), AppUser.salto_hash.is_not(None)),
-            )
-            .limit(1)
-        )
-    )
+# ─────────────────────────── Buchung ─────────────────────────────────
 
 
 def _confirm_page(
     request: Request,
     session: Session,
+    user: AppUser,
     consumable: Consumable,
     sens: str,
     erreur: str | None = None,
     status_code: int = 200,
 ) -> HTMLResponse:
-    users = list(
-        session.scalars(select(AppUser).where(AppUser.actif == 1).order_by(AppUser.nom)).all()
-    )
     return templates.TemplateResponse(
         request,
         "kiosk_confirm.html",
         _ctx(
             session,
+            user,
             consumable=consumable,
             qte=stock_for(session, consumable.id),
-            users=users,
-            badge_mode=_badge_mode(session),
             sens=sens if sens in ("sortie", "retour") else "sortie",
             erreur=erreur,
         ),
@@ -156,22 +230,21 @@ def confirm_form(
     request: Request,
     sens: str = "sortie",
     session: Session = Depends(get_session),
+    user: AppUser = Depends(require_kiosk),
 ) -> HTMLResponse:
     consumable = session.get(Consumable, consumable_id)
     if consumable is None:
         raise HTTPException(status_code=404, detail="Consommable inconnu")
-    return _confirm_page(request, session, consumable, sens)
+    return _confirm_page(request, session, user, consumable, sens)
 
 
 @router.post("/kiosk/retrait")
 def book(
     request: Request,
     session: Session = Depends(get_session),
+    user: AppUser = Depends(require_kiosk),
     consumable_id: int = Form(...),
     quantite: int = Form(1),
-    user_id: int = Form(0),
-    badge: str = Form(""),
-    ticket: str = Form(""),
     sens: str = Form("sortie"),
 ) -> Response:
     consumable = session.get(Consumable, consumable_id)
@@ -181,43 +254,17 @@ def book(
     quantite = max(1, min(quantite, 99))
     stock = stock_for(session, consumable_id)
 
-    # Person bestimmen: Badge hat Vorrang, sonst Auswahl aus der Liste
-    user: AppUser | None = None
-    badge_type: str | None = None
-    # Ticket: PC/SC-Leser über den Lesedienst. badge: Leser im Tastaturmodus.
-    digest = einloesen(ticket.strip()) if ticket.strip() else None
-    if digest or badge.strip():
-        digest = digest or badge_hash(badge)
-        user = session.scalar(
-            select(AppUser).where(
-                AppUser.actif == 1,
-                or_(AppUser.mycard_hash == digest, AppUser.salto_hash == digest),
-            )
-        )
-        if user is None:
-            return _confirm_page(
-                request, session, consumable, sens,
-                erreur="Badge inconnu. Faites-le enregistrer par l'administrateur.",
-                status_code=403,
-            )
-        badge_type = "mycard" if user.mycard_hash == digest else "salto"
-    elif user_id:
-        user = session.get(AppUser, user_id)
-    elif _badge_mode(session):
-        return _confirm_page(
-            request, session, consumable, sens,
-            erreur="Présentez votre badge pour confirmer.",
-            status_code=400,
-        )
-
     if sens == "retour":
         delta, motif = quantite, "retour"
     else:
         delta, motif = -quantite, "retrait"
         if stock - quantite < 0:
-            # Negativbestand blockieren (SPEC 12, offener Punkt 6)
             return _confirm_page(
-                request, session, consumable, sens,
+                request,
+                session,
+                user,
+                consumable,
+                sens,
                 erreur=f"Stock insuffisant : il ne reste que {stock}.",
                 status_code=400,
             )
@@ -227,23 +274,12 @@ def book(
         consumable_id=consumable_id,
         delta=delta,
         motif=motif,
-        user_id=user.id if user else None,
-        badge_type=badge_type,
+        user_id=user.id,
     )
     session.commit()
+
     return templates.TemplateResponse(
         request,
         "kiosk_done.html",
-        _ctx(
-            session,
-            consumable=consumable,
-            delta=delta,
-            reste=stock + delta,
-            user=user,
-        ),
+        _ctx(session, user, consumable=consumable, delta=delta, reste=stock + delta),
     )
-
-
-def _mapping_state(session: Session, models: list[tuple[PrinterModel, int]]) -> dict[int, bool]:
-    """{model_id: hat Material} — Modelle ohne Material werden ausgegraut."""
-    return {model.id: bool(model.mapping_ok) for model, _ in models}
