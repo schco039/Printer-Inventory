@@ -25,7 +25,7 @@
 
 {% if a_mapper %}
 <section class="panel todo">
-  <h2>⚠ {{ a_mapper|length }} modèle{{ 's' if a_mapper|length > 1 }} sans consommables</h2>
+  <h2>{{ a_mapper|length }} modèle{{ 's' if a_mapper|length > 1 }} sans consommables</h2>
   <p>
     Ces modèles sont en service mais aucun consommable ne leur est associé.
     Le kiosque les affiche en grisé tant que ce n'est pas fait.

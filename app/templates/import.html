@@ -5,10 +5,10 @@
 <h1>Import de l'inventaire</h1>
 
 {% if request.query_params.get('ok') %}
-<p class="banner ok">✓ Import n° {{ request.query_params.get('ok') }} appliqué.</p>
+<p class="banner ok">Import n° {{ request.query_params.get('ok') }} appliqué.</p>
 {% endif %}
 {% if erreur %}
-<p class="banner err">✕ {{ erreur }}</p>
+<p class="banner err">{{ erreur }}</p>
 {% endif %}
 
 <section class="panel">

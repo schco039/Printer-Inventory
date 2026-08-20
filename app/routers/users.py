@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.auth import require_admin
 from app.db import get_session
 from app.deps import templates
-from app.models import AppUser, Movement
+from app.models import AppUser, Delivery, Movement
 from app.security import (
     MAX_ECHECS,
     PIN_LAENGE_MIN,
@@ -182,3 +182,62 @@ def unlock(user_id: int, session: Session = Depends(get_session)) -> RedirectRes
     user.bloque_jusqua = None
     session.commit()
     return RedirectResponse("/admin/utilisateurs?message=Compte+débloqué", status_code=303)
+
+
+@router.post("/admin/utilisateurs/{user_id}/supprimer")
+def delete_user(
+    user_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+) -> RedirectResponse:
+    """Person löschen — aber nur, wenn keine Buchung an ihr hängt.
+
+    Das Hauptbuch muss lesbar bleiben: wer etwas entnommen hat, darf nicht
+    spurlos verschwinden. Solche Konten werden stattdessen deaktiviert.
+    """
+    user = session.get(AppUser, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+
+    if request.session.get("uid") == user_id:
+        return RedirectResponse(
+            "/admin/utilisateurs?erreur=Vous+ne+pouvez+pas+supprimer+votre+propre+compte",
+            status_code=303,
+        )
+
+    nb_mouvements = session.scalar(
+        select(func.count()).select_from(Movement).where(Movement.user_id == user_id)
+    ) or 0
+    nb_livraisons = session.scalar(
+        select(func.count()).select_from(Delivery).where(Delivery.created_by == user_id)
+    ) or 0
+
+    if nb_mouvements or nb_livraisons:
+        user.actif = 0
+        session.commit()
+        return RedirectResponse(
+            f"/admin/utilisateurs?erreur={user.nom}+a+{nb_mouvements}+mouvement(s)+"
+            "et+ne+peut+pas+être+supprimé+—+le+compte+a+été+désactivé",
+            status_code=303,
+        )
+
+    # Letzten Administrator nicht entfernen
+    if user.role == "admin":
+        autres = session.scalar(
+            select(func.count()).select_from(AppUser).where(
+                AppUser.role == "admin", AppUser.actif == 1,
+                AppUser.pin_hash.is_not(None), AppUser.id != user_id,
+            )
+        ) or 0
+        if not autres:
+            return RedirectResponse(
+                "/admin/utilisateurs?erreur=Impossible+de+supprimer+le+dernier+administrateur",
+                status_code=303,
+            )
+
+    nom = user.nom
+    session.delete(user)
+    session.commit()
+    return RedirectResponse(
+        f"/admin/utilisateurs?message={nom}+supprimé", status_code=303
+    )

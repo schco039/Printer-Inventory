@@ -9,28 +9,46 @@
 {% block content %}
 
 {% if models %}
-<ul class="k-list">
+<div class="k-grid">
   {% for model, nb in models %}
+  {% set info = apercu.get(model.id, {}) %}
   {% if mapping.get(model.id) %}
-  <li>
-    <a href="/kiosk/modele/{{ model.slug }}">
-      <span class="k-name">{{ model.libelle }}</span>
-      <span class="k-meta">{{ nb }} appareil{{ 's' if nb > 1 }}</span>
-      <span class="k-arrow">›</span>
-    </a>
-  </li>
-  {% else %}
-  <li class="k-disabled">
-    <span>
-      <span class="k-name">{{ model.libelle }}</span>
-      <span class="k-meta">⚠ consommables non configurés</span>
+  <a class="k-card {{ 'is-alert' if info.rupture }}" href="/kiosk/modele/{{ model.slug }}">
+    <span class="k-card-top">
+      <span class="k-card-name">{{ model.modele_affiche }}</span>
+      {% if not marque %}<span class="k-card-brand">{{ model.marque_affichee }}</span>{% endif %}
     </span>
-  </li>
+
+    <span class="k-card-colors">
+      {% for f in info.farben %}
+      <span class="k-chip {{ 'zero' if f.total <= 0 }}">
+        {% if f.couleur %}<span class="k-swatch swatch-{{ f.couleur }}"></span>{% endif %}
+        <span class="k-chip-n">{{ f.total }}</span>
+      </span>
+      {% endfor %}
+    </span>
+
+    <span class="k-card-foot">
+      <span>{{ nb }} appareil{{ 's' if nb > 1 }}</span>
+      {% if info.rupture %}<span class="k-flag">rupture</span>{% endif %}
+    </span>
+  </a>
+  {% else %}
+  <span class="k-card is-off">
+    <span class="k-card-top">
+      <span class="k-card-name">{{ model.modele_affiche }}</span>
+      {% if not marque %}<span class="k-card-brand">{{ model.marque_affichee }}</span>{% endif %}
+    </span>
+    <span class="k-card-foot">
+      <span>{{ nb }} appareil{{ 's' if nb > 1 }}</span>
+      <span class="k-flag">à configurer</span>
+    </span>
+  </span>
   {% endif %}
   {% endfor %}
-</ul>
+</div>
 {% else %}
-<p class="k-empty">Aucun modèle en service. Importez d'abord l'inventaire.</p>
+<p class="k-empty">Aucun modèle en service.</p>
 {% endif %}
 
 {% endblock %}

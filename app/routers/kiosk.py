@@ -109,6 +109,26 @@ def _active_models(session: Session) -> list[tuple[PrinterModel, int]]:
     return [(model, int(nb)) for model, nb in rows]
 
 
+def _apercu(session: Session, models: list[tuple[PrinterModel, int]]) -> dict[int, dict]:
+    """Kurzüberblick je Modell für die Kachel: Farben und schwächster Bestand.
+
+    So sieht man schon auf der Übersicht, wo etwas fehlt — ohne hineinzutippen.
+    """
+    out: dict[int, dict] = {}
+    for model, _nb in models:
+        gruppen = kiosk_groups(session, model.id)
+        farben = [
+            {"couleur": g["couleur"], "label": g["label"], "total": g["total"]}
+            for g in gruppen
+        ]
+        out[model.id] = {
+            "farben": farben,
+            "rupture": any(g["total"] <= 0 for g in gruppen),
+            "total": sum(g["total"] for g in gruppen),
+        }
+    return out
+
+
 def _brand_level(session: Session, models: list[tuple[PrinterModel, int]]) -> bool:
     mode = get_setting(session, "kiosk_brand_level") or "auto"
     if mode == "always":
@@ -143,6 +163,7 @@ def catalogue(
             models=models,
             marque=None,
             mapping={m.id: bool(m.mapping_ok) for m, _ in models},
+            apercu=_apercu(session, models),
         ),
     )
 
@@ -168,6 +189,7 @@ def par_marque(
             models=models,
             marque=marque,
             mapping={m.id: bool(m.mapping_ok) for m, _ in models},
+            apercu=_apercu(session, models),
         ),
     )
 

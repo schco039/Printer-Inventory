@@ -5,7 +5,7 @@
 {% set manquants = rows | rejectattr('consumables') | list %}
 
 <h1>Compatibilités
-  {% if manquants %}<span class="count warn-text">⚠ {{ manquants|length }} à configurer</span>{% endif %}
+  {% if manquants %}<span class="count warn-text">{{ manquants|length }} à configurer</span>{% endif %}
 </h1>
 
 <p class="hint">

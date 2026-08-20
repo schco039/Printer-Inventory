@@ -277,10 +277,13 @@ def test_kiosk_falscher_pin(anon, db):
 
 
 def test_kiosk_ohne_material_zeigt_modelle_ausgegraut(client, kiosk, export):
+    """Modelle ohne Material bleiben sichtbar, aber gesperrt und beschriftet."""
     do_import(client, export)
     page = kiosk.get("/kiosk/catalogue").text
-    assert "consommables non configurés" in page
-    assert "Brother HL-L8260CDW" in page
+    assert "à configurer" in page
+    assert "HL-L8260CDW" in page
+    assert "is-off" in page                  # Kachel ist nicht anwählbar
+    assert "/kiosk/modele/brother-hl-l8260cdw" not in page
 
 
 def test_kiosk_zeigt_farben_und_bestand(client, kiosk, db, export):

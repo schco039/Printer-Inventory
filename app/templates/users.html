@@ -4,8 +4,8 @@
 
 <h1>Utilisateurs <span class="count">{{ users|length }}</span></h1>
 
-{% if erreur %}<p class="banner err">✕ {{ erreur }}</p>{% endif %}
-{% if message %}<p class="banner ok">✓ {{ message }}</p>{% endif %}
+{% if erreur %}<p class="banner err">{{ erreur }}</p>{% endif %}
+{% if message %}<p class="banner ok">{{ message }}</p>{% endif %}
 
 {% if nouveau_code %}
 <section class="panel code-nouveau">
@@ -23,6 +23,9 @@
   (identifiant + code). Après {{ max_echecs }} essais incorrects, le compte se
   bloque quelques minutes — c'est la vraie protection d'un code à
   {{ pin_min }} chiffres.
+  <br>
+  Une personne qui a déjà retiré du matériel ne peut pas être supprimée : son
+  compte est alors désactivé, pour que l'historique reste lisible.
 </p>
 
 <section class="panel">
@@ -96,6 +99,11 @@
             <button type="submit" class="link-btn">Débloquer</button>
           </form>
           {% endif %}
+          <form method="post" action="/admin/utilisateurs/{{ u.id }}/supprimer"
+                class="inline-block"
+                onsubmit="return confirm('Supprimer {{ u.nom }} définitivement ?');">
+            <button type="submit" class="link-btn danger">Supprimer</button>
+          </form>
         </td>
       </tr>
       {% endfor %}

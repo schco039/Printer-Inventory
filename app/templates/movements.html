@@ -5,7 +5,7 @@
 <h1>Mouvements</h1>
 
 {% if request.query_params.get('ok') %}
-<p class="banner ok">✓ {{ request.query_params.get('ok') }} écriture(s) enregistrée(s).</p>
+<p class="banner ok">{{ request.query_params.get('ok') }} écriture(s) enregistrée(s).</p>
 {% endif %}
 
 <form class="filters" method="get">

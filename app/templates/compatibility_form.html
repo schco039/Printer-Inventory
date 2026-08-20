@@ -6,7 +6,7 @@
 <h1>{{ model.libelle }} <span class="count">{{ nb }} appareil{{ 's' if nb > 1 }}</span></h1>
 
 {% if request.query_params.get('ok') %}
-<p class="banner ok">✓ Enregistré.</p>
+<p class="banner ok">Enregistré.</p>
 {% endif %}
 
 <section class="panel">
@@ -121,7 +121,7 @@
       </table>
     </div>
     <p class="hint">
-      ℹ Seuils proposés : {{ nb }} appareil{{ 's' if nb > 1 }} ÷ {{ reserve }} = {{ seuil }} (modifiable)
+      Seuils proposés : {{ nb }} appareil{{ 's' if nb > 1 }} ÷ {{ reserve }} = {{ seuil }} (modifiable)
     </p>
     <div class="actions">
       <a class="btn" href="/admin/compatibilites/{{ model.id }}">Annuler</a>

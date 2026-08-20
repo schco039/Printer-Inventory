@@ -33,14 +33,14 @@
 
   {% if plan.new_brands %}
   <p class="banner warn">
-    ⚠ Nouvelle{{ 's' if plan.new_brands|length > 1 }} marque{{ 's' if plan.new_brands|length > 1 }} :
+    Nouvelle{{ 's' if plan.new_brands|length > 1 }} marque{{ 's' if plan.new_brands|length > 1 }} :
     <strong>{{ plan.new_brands|join(', ') }}</strong> — le kiosque affichera désormais l'écran « Marque ».
   </p>
   {% endif %}
 
   {% if plan.new_models %}
   <p class="banner warn">
-    ⚠ {{ plan.new_models|length }} nouveau{{ 'x' if plan.new_models|length > 1 }} modèle{{ 's' if plan.new_models|length > 1 }}
+    {{ plan.new_models|length }} nouveau{{ 'x' if plan.new_models|length > 1 }} modèle{{ 's' if plan.new_models|length > 1 }}
     sans consommable associé : {{ plan.new_models|join(', ') }}.
     À compléter dans « Compatibilités » après l'import.
   </p>
